@@ -1,0 +1,154 @@
+import { StyleSheet, Dimensions } from 'react-native';
+
+const { width } = Dimensions.get('window');
+
+export const colors = {
+  primary: '#3b82f6',
+  primaryDark: '#2563eb',
+  secondary: '#1e40af',
+  secondaryDark: '#1e3a8a',
+  background: '#ffffff',
+  backgroundLight: '#f0f7ff',
+  backgroundGray: '#f8fafc',
+  text: '#1e293b',
+  textMuted: '#6b7280',
+  textLight: '#94a3b8',
+  border: '#e2e8f0',
+  borderLight: '#cbd5e1',
+  success: '#16a34a',
+  successLight: '#dcfce7',
+  error: '#dc2626',
+  errorLight: '#fee2e2',
+  white: '#ffffff',
+  blue50: '#eff6ff',
+  blue100: '#dbeafe',
+  blue200: '#bfdbfe',
+};
+
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+};
+
+export const borderRadius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  full: 9999,
+};
+
+export const shadows = {
+  sm: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+};
+
+export const typography = {
+  h1: {
+    fontSize: 28,
+    fontWeight: '700' as const,
+    color: colors.text,
+  },
+  h2: {
+    fontSize: 24,
+    fontWeight: '700' as const,
+    color: colors.text,
+  },
+  h3: {
+    fontSize: 20,
+    fontWeight: '600' as const,
+    color: colors.text,
+  },
+  h4: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: colors.text,
+  },
+  body: {
+    fontSize: 15,
+    fontWeight: '400' as const,
+    color: colors.text,
+  },
+  small: {
+    fontSize: 13,
+    fontWeight: '400' as const,
+    color: colors.textMuted,
+  },
+  caption: {
+    fontSize: 12,
+    fontWeight: '500' as const,
+    color: colors.textLight,
+  },
+};
+
+export const commonStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.sm,
+  },
+  button: {
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonPrimary: {
+    backgroundColor: colors.primary,
+  },
+  buttonText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: colors.white,
+  },
+  input: {
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    fontSize: 15,
+    backgroundColor: colors.backgroundGray,
+    color: colors.text,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  spaceBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+});
