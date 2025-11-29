@@ -22,6 +22,7 @@ from .services import (
     confidence_scorer,
     youtube_service
 )
+from .services.gemini_service import gemini_service
 
 logger = logging.getLogger(__name__)
 
@@ -341,3 +342,253 @@ class ServiceStatusView(APIView):
         }
         
         return Response(status_data)
+
+
+class QuizGeneratorView(APIView):
+    """
+    Generate quiz from topic or document text
+    """
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    
+    def post(self, request):
+        """
+        Generate a quiz based on topic or document
+        
+        Request body:
+        - topic: Topic text or document content
+        - num_questions: Number of questions (default: 5)
+        - difficulty: easy, medium, or hard (default: medium)
+        - document: Optional document file upload
+        """
+        try:
+            # Get parameters
+            topic = request.data.get('topic', '')
+            num_questions = int(request.data.get('num_questions', 5))
+            difficulty = request.data.get('difficulty', 'medium')
+            
+            # Handle document upload
+            if 'document' in request.FILES:
+                document_file = request.FILES['document']
+                # Save temporarily
+                file_name = default_storage.save(f'temp/{document_file.name}', 
+                                                ContentFile(document_file.read()))
+                file_path = default_storage.path(file_name)
+                
+                try:
+                    # Extract text from document (using OCR for images, or read text files)
+                    if document_file.name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
+                        ocr_result = ocr_service.extract_text_from_image(file_path)
+                        if ocr_result['success']:
+                            topic = ocr_result['text']
+                        else:
+                            return Response({
+                                'error': 'Failed to extract text from document',
+                                'details': ocr_result.get('error', 'Unknown error')
+                            }, status=status.HTTP_400_BAD_REQUEST)
+                    elif document_file.name.lower().endswith('.txt'):
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            topic = f.read()
+                    else:
+                        return Response({
+                            'error': 'Unsupported file format. Please use .txt, .png, .jpg, or .jpeg'
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                finally:
+                    # Clean up temp file
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+            
+            if not topic or not topic.strip():
+                return Response({
+                    'error': 'Please provide a topic or upload a document'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Generate quiz using Gemini
+            logger.info(f"Generating quiz with {num_questions} questions, difficulty: {difficulty}")
+            result = gemini_service.generate_quiz(topic, num_questions, difficulty)
+            
+            if result['success']:
+                return Response(result['quiz'], status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': result.get('error', 'Failed to generate quiz'),
+                    'details': result.get('details', '')
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"Quiz generation error: {e}", exc_info=True)
+            return Response({
+                'error': 'Internal server error',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class FlashcardGeneratorView(APIView):
+    """
+    Generate flashcards from topic or document text
+    """
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    
+    def post(self, request):
+        """
+        Generate flashcards based on topic or document
+        
+        Request body:
+        - topic: Topic text or document content
+        - num_cards: Number of flashcards (default: 10)
+        - document: Optional document file upload
+        """
+        try:
+            # Get parameters
+            topic = request.data.get('topic', '')
+            num_cards = int(request.data.get('num_cards', 10))
+            
+            # Handle document upload
+            if 'document' in request.FILES:
+                document_file = request.FILES['document']
+                # Save temporarily
+                file_name = default_storage.save(f'temp/{document_file.name}', 
+                                                ContentFile(document_file.read()))
+                file_path = default_storage.path(file_name)
+                
+                try:
+                    # Extract text from document (using OCR for images, or read text files)
+                    if document_file.name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
+                        ocr_result = ocr_service.extract_text_from_image(file_path)
+                        if ocr_result['success']:
+                            topic = ocr_result['text']
+                        else:
+                            return Response({
+                                'error': 'Failed to extract text from document',
+                                'details': ocr_result.get('error', 'Unknown error')
+                            }, status=status.HTTP_400_BAD_REQUEST)
+                    elif document_file.name.lower().endswith('.txt'):
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            topic = f.read()
+                    else:
+                        return Response({
+                            'error': 'Unsupported file format. Please use .txt, .png, .jpg, or .jpeg'
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                finally:
+                    # Clean up temp file
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+            
+            if not topic or not topic.strip():
+                return Response({
+                    'error': 'Please provide a topic or upload a document'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Generate flashcards using Gemini
+            logger.info(f"Generating {num_cards} flashcards")
+            result = gemini_service.generate_flashcards(topic, num_cards)
+            
+            if result['success']:
+                return Response(result['flashcards'], status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': result.get('error', 'Failed to generate flashcards'),
+                    'details': result.get('details', '')
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"Flashcard generation error: {e}", exc_info=True)
+            return Response({
+                'error': 'Internal server error',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class StudyMaterialGeneratorView(APIView):
+    """
+    Generate comprehensive study material from sample papers/documents
+    """
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    
+    def post(self, request):
+        """
+        Generate study material from uploaded document or text
+        
+        Request body:
+        - text: Direct text content
+        - document: Document file upload (.txt, .pdf, .jpg, .png)
+        
+        Returns topics, concepts, study notes, and sample questions
+        """
+        try:
+            text_content = request.data.get('text', '')
+            
+            # Handle document upload
+            if 'document' in request.FILES:
+                document_file = request.FILES['document']
+                file_name = default_storage.save(f'temp/{document_file.name}', 
+                                                ContentFile(document_file.read()))
+                file_path = default_storage.path(file_name)
+                
+                try:
+                    # Extract text from document
+                    if document_file.name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
+                        # Use OCR for images
+                        ocr_result = ocr_service.extract_text_from_image(file_path)
+                        if ocr_result['success']:
+                            text_content = ocr_result['text']
+                        else:
+                            return Response({
+                                'error': 'Failed to extract text from image',
+                                'details': ocr_result.get('error', 'Unknown error')
+                            }, status=status.HTTP_400_BAD_REQUEST)
+                    elif document_file.name.lower().endswith('.txt'):
+                        # Read text file
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            text_content = f.read()
+                    elif document_file.name.lower().endswith('.pdf'):
+                        # For PDF, try to read as text (basic support)
+                        try:
+                            import PyPDF2
+                            with open(file_path, 'rb') as f:
+                                pdf_reader = PyPDF2.PdfReader(f)
+                                text_content = ""
+                                for page in pdf_reader.pages:
+                                    text_content += page.extract_text() + "\n"
+                        except ImportError:
+                            # If PyPDF2 not available, use OCR on each page
+                            ocr_result = ocr_service.extract_text_from_image(file_path)
+                            if ocr_result['success']:
+                                text_content = ocr_result['text']
+                            else:
+                                return Response({
+                                    'error': 'PDF support requires PyPDF2. Please install it or upload as image.',
+                                    'details': 'pip install PyPDF2'
+                                }, status=status.HTTP_400_BAD_REQUEST)
+                    else:
+                        return Response({
+                            'error': 'Unsupported file format',
+                            'details': 'Please use .txt, .pdf, .png, .jpg, or .jpeg'
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                finally:
+                    # Clean up temp file
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+            
+            if not text_content or not text_content.strip():
+                return Response({
+                    'error': 'Please provide text content or upload a document'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Generate study material using Gemini
+            logger.info("Generating comprehensive study material")
+            result = gemini_service.generate_study_material(text_content)
+            
+            if result['success']:
+                return Response(result['study_material'], status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': result.get('error', 'Failed to generate study material'),
+                    'details': result.get('details', '')
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"Study material generation error: {e}", exc_info=True)
+            return Response({
+                'error': 'Internal server error',
+                'details': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
