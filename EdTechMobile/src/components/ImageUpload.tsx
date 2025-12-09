@@ -29,7 +29,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ onSubmit, loading }) =
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.8,
     });
@@ -59,7 +59,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ onSubmit, loading }) =
 
   const handleSubmit = () => {
     if (imageUri) {
-      onSubmit({ image: imageUri, max_results: 5 });
+      onSubmit(imageUri);
     }
   };
 

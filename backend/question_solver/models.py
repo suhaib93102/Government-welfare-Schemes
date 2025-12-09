@@ -1,3 +1,286 @@
 from django.db import models
+from django.utils import timezone
+import uuid
+from datetime import timedelta
 
-# Create your models here.
+
+class UserSubscription(models.Model):
+    """Track user subscription status and feature limits"""
+    PLAN_CHOICES = [
+        ('free', 'Free'),
+        ('premium', 'Premium'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_id = models.CharField(max_length=255, unique=True)  # Can be device ID or user email
+    plan = models.CharField(max_length=50, choices=PLAN_CHOICES, default='free')
+    
+    # Feature usage tracking
+    ask_questions_used = models.IntegerField(default=0)  # Monthly usage
+    quiz_generated = models.IntegerField(default=0)  # Monthly usage
+    flashcards_generated = models.IntegerField(default=0)  # Monthly usage
+    
+    # Auto-pay settings
+    auto_pay_enabled = models.BooleanField(default=False)
+    payment_method = models.CharField(max_length=50, blank=True)  # 'card', 'upi', 'wallet'
+    
+    # Billing dates
+    subscription_start_date = models.DateTimeField(auto_now_add=True)
+    subscription_end_date = models.DateTimeField(null=True, blank=True)
+    next_billing_date = models.DateTimeField(null=True, blank=True)
+    last_payment_date = models.DateTimeField(null=True, blank=True)
+    
+    # Tracking
+    usage_reset_date = models.DateTimeField(null=True, blank=True)  # Monthly reset date
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user_id']),
+            models.Index(fields=['plan']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user_id} - {self.plan.upper()} Plan"
+    
+    def get_feature_limits(self):
+        """Get feature limits based on plan"""
+        if self.plan == 'free':
+            return {
+                'ask_questions': {'limit': 3, 'used': self.ask_questions_used},
+                'quiz': {'limit': 3, 'used': self.quiz_generated},
+                'flashcards': {'limit': 3, 'used': self.flashcards_generated},
+            }
+        elif self.plan == 'premium':
+            return {
+                'ask_questions': {'limit': None, 'used': self.ask_questions_used},  # Unlimited
+                'quiz': {'limit': None, 'used': self.quiz_generated},  # Unlimited
+                'flashcards': {'limit': None, 'used': self.flashcards_generated},  # Unlimited
+            }
+    
+    def can_use_feature(self, feature_name):
+        """Check if user can use a feature"""
+        limits = self.get_feature_limits()
+        if feature_name not in limits:
+            return True
+        
+        feature = limits[feature_name]
+        if feature['limit'] is None:
+            return True  # Unlimited
+        
+        return feature['used'] < feature['limit']
+    
+    def increment_feature_usage(self, feature_name):
+        """Increment feature usage"""
+        if feature_name == 'ask_questions':
+            self.ask_questions_used += 1
+        elif feature_name == 'quiz':
+            self.quiz_generated += 1
+        elif feature_name == 'flashcards':
+            self.flashcards_generated += 1
+        self.save()
+    
+    def reset_monthly_usage(self):
+        """Reset monthly usage counters"""
+        self.ask_questions_used = 0
+        self.quiz_generated = 0
+        self.flashcards_generated = 0
+        self.usage_reset_date = timezone.now()
+        self.save()
+
+
+class Payment(models.Model):
+    """Track payment transactions"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('refunded', 'Refunded'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    subscription = models.ForeignKey(UserSubscription, on_delete=models.CASCADE, related_name='payments')
+    
+    amount = models.DecimalField(max_digits=10, decimal_places=2)  # 1.99 for premium
+    currency = models.CharField(max_length=3, default='INR')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    payment_method = models.CharField(max_length=50)
+    transaction_id = models.CharField(max_length=255, unique=True)
+    
+    # Razorpay specific fields
+    razorpay_order_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
+    razorpay_payment_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
+    razorpay_signature = models.CharField(max_length=255, blank=True, null=True)
+    
+    billing_cycle_start = models.DateTimeField()
+    billing_cycle_end = models.DateTimeField()
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['subscription', '-created_at']),
+            models.Index(fields=['status']),
+        ]
+    
+    def __str__(self):
+        return f"Payment {self.transaction_id} - {self.status.upper()} (₹{self.amount})"
+
+
+class FeatureUsageLog(models.Model):
+    """Detailed log of feature usage"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    subscription = models.ForeignKey(UserSubscription, on_delete=models.CASCADE, related_name='usage_logs')
+    
+    feature_name = models.CharField(max_length=50)  # 'ask_questions', 'quiz', 'flashcards'
+    usage_type = models.CharField(max_length=20)  # 'image', 'text', 'file'
+    input_size = models.IntegerField(help_text="Size in characters or bytes")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['subscription', '-created_at']),
+            models.Index(fields=['feature_name']),
+        ]
+    
+    def __str__(self):
+        return f"{self.subscription.user_id} - {self.feature_name} ({self.created_at.date()})"
+
+
+class Quiz(models.Model):
+    """Store quiz sessions with metadata"""
+    DIFFICULTY_CHOICES = [
+        ('beginner', 'Beginner'),
+        ('intermediate', 'Intermediate'),
+        ('advanced', 'Advanced'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    source_type = models.CharField(max_length=50, choices=[
+        ('youtube', 'YouTube'),
+        ('text', 'Text'),
+        ('image', 'Image'),
+    ])
+    source_id = models.CharField(max_length=255, blank=True)  # video_id or transcript_id
+    summary = models.TextField()
+    difficulty_level = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='intermediate')
+    total_questions = models.IntegerField(default=5)
+    estimated_time = models.IntegerField(help_text="Estimated time in minutes")
+    keywords = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.title} ({self.total_questions} questions)"
+
+
+class QuizQuestion(models.Model):
+    """Store individual quiz questions"""
+    QUESTION_TYPE_CHOICES = [
+        ('mcq', 'Multiple Choice'),
+        ('true_false', 'True/False'),
+        ('short_answer', 'Short Answer'),
+        ('essay', 'Essay'),
+        ('matching', 'Matching'),
+    ]
+    DIFFICULTY_CHOICES = [
+        ('beginner', 'Beginner'),
+        ('intermediate', 'Intermediate'),
+        ('advanced', 'Advanced'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='questions')
+    question_text = models.TextField()
+    question_type = models.CharField(max_length=20, choices=QUESTION_TYPE_CHOICES)
+    order = models.IntegerField()
+    
+    # For MCQ and True/False
+    options = models.JSONField(default=list, blank=True)  # List of option dicts: [{"text": "...", "is_correct": bool}]
+    correct_answer = models.CharField(max_length=500, blank=True)  # For short answer/essay
+    
+    # Explanation
+    explanation = models.TextField(blank=True)
+    hint = models.TextField(blank=True)
+    
+    # Difficulty at question level
+    difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='intermediate')
+    tags = models.JSONField(default=list, blank=True)  # Related topics/concepts
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['quiz', 'order']
+        unique_together = ['quiz', 'order']
+    
+    def __str__(self):
+        return f"Q{self.order}: {self.question_text[:50]}..."
+
+
+class UserQuizResponse(models.Model):
+    """Track user responses and scores"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='user_responses')
+    session_id = models.CharField(max_length=255, default='anonymous')
+    
+    # Timing
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    time_taken = models.IntegerField(null=True, blank=True, help_text="Time taken in seconds")
+    
+    # Responses
+    responses = models.JSONField(default=dict)  # {question_id: {"user_answer": "...", "is_correct": bool, "time_spent": seconds}}
+    
+    # Scoring
+    score = models.FloatField(null=True, blank=True)  # Percentage
+    correct_answers = models.IntegerField(default=0)
+    total_answers = models.IntegerField(default=0)
+    
+    # Feedback
+    feedback = models.TextField(blank=True)
+    strengths = models.JSONField(default=list)  # Topics user performed well on
+    weaknesses = models.JSONField(default=list)  # Topics needing improvement
+    
+    class Meta:
+        ordering = ['-started_at']
+    
+    def __str__(self):
+        return f"{self.session_id} - {self.quiz.title} ({self.score}%)"
+
+
+class QuizSummary(models.Model):
+    """Store quiz performance summaries"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='summaries')
+    session_id = models.CharField(max_length=255, default='anonymous')
+    
+    # Overall stats
+    attempts = models.IntegerField(default=0)
+    best_score = models.FloatField(null=True, blank=True)
+    average_score = models.FloatField(null=True, blank=True)
+    
+    # Performance analysis
+    analysis = models.JSONField(default=dict)  # {
+                                                 #   "overall_feedback": "...",
+                                                 #   "topic_performance": {"topic": "score"},
+                                                 #   "recommendations": ["..."],
+                                                 #   "next_topics": ["..."]
+                                                 # }
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Summary: {self.quiz.title} - Best: {self.best_score}%"

@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'question_solver',
+    'youtube_summarizer',
 ]
 
 MIDDLEWARE = [
@@ -148,3 +149,22 @@ SERP_API_KEY = os.getenv('SERP_API_KEY', '')
 YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY', '')
 FIRECRAWL_API_KEY = os.getenv('FIRECRAWL_API_KEY', '')
 GOOGLE_VISION_API_KEY = os.getenv('GOOGLE_VISION_API_KEY', '')
+
+# Razorpay Payment Gateway Configuration
+RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '')
+RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '')
+
+# Gemini API
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+
+# Google OAuth Configuration
+GOOGLE_OAUTH_CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID', '')
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', '')
+GOOGLE_OAUTH_REDIRECT_URI = os.getenv('GOOGLE_OAUTH_REDIRECT_URI', '')
+FRONTEND_REDIRECT_URI = os.getenv('FRONTEND_REDIRECT_URI', '')
+
+# JWT Configuration
+JWT_SECRET = os.getenv('JWT_SECRET', '')
+JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
+JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', 24))
+REFRESH_TOKEN_EXPIRATION_DAYS = int(os.getenv('REFRESH_TOKEN_EXPIRATION_DAYS', 7))

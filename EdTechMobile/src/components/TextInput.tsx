@@ -12,9 +12,14 @@ import { colors, spacing, borderRadius, typography, shadows } from '../styles/th
 interface TextInputComponentProps {
   onSubmit: (data: string) => void;
   loading?: boolean;
+  placeholder?: string;
 }
 
-export const TextInputComponent: React.FC<TextInputComponentProps> = ({ onSubmit, loading }) => {
+export const TextInputComponent: React.FC<TextInputComponentProps> = ({ 
+  onSubmit, 
+  loading,
+  placeholder = "Paste your problem statement, show your work, or ask for hints..."
+}) => {
   const [text, setText] = useState('');
 
   const handleSubmit = () => {
@@ -29,7 +34,7 @@ export const TextInputComponent: React.FC<TextInputComponentProps> = ({ onSubmit
     <View style={styles.container}>
       <TextInput
         style={styles.textarea}
-        placeholder="Paste your problem statement, show your work, or ask for hints..."
+        placeholder={placeholder}
         placeholderTextColor={colors.textLight}
         value={text}
         onChangeText={setText}

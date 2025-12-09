@@ -10,6 +10,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include('question_solver.urls')),
+    path("api/youtube/", include('youtube_summarizer.urls')),
 ]
 
 # Serve media files in development

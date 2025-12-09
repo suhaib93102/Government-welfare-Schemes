@@ -220,7 +220,7 @@ Rules:
 
 From the following sample paper/document text, generate comprehensive study material:
 
-1. IMPORTANT TOPICS (5–15 high-level subjects covered)
+1. IMPORTANT TOPICS (5–15 high-level Flash Cards covered)
    - Should be clear subject areas or themes
    - Brief and focused
 

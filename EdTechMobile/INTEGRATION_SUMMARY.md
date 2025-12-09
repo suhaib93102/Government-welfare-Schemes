@@ -1,4 +1,4 @@
-# 🎯 Backend Integration Summary
+#  Backend Integration Summary
 
 ## ✅ Integration Complete!
 
@@ -47,7 +47,7 @@ Your ED Tech Mobile app is now fully connected to the Django backend API.
 
 ---
 
-## 🎯 How to Test
+##  How to Test
 
 ### Quick Test (Recommended)
 ```bash

@@ -97,4 +97,351 @@ export const checkServiceStatus = async () => {
   }
 };
 
+/**
+ * Generate quiz from topic or document
+ * @param topic - The topic or text content
+ * @param numQuestions - Number of questions to generate (default: 5)
+ * @param difficulty - Difficulty level: easy, medium, hard (default: medium)
+ * @param document - Optional document file
+ */
+export const generateQuiz = async (
+  topic: string, 
+  numQuestions: number = 5, 
+  difficulty: string = 'medium',
+  document?: any
+) => {
+  try {
+    const formData = new FormData();
+    
+    if (document) {
+      // For web, document might already be a File object
+      if (Platform.OS === 'web' && document.file) {
+        formData.append('document', document.file);
+      } else if (Platform.OS === 'web' && document instanceof File) {
+        formData.append('document', document);
+      } else {
+        // For mobile platforms
+        const documentFile = {
+          uri: document.uri,
+          type: document.mimeType || document.type || 'application/octet-stream',
+          name: document.name || 'document',
+        } as any;
+        formData.append('document', documentFile);
+      }
+    } else {
+      formData.append('topic', topic);
+    }
+    
+    formData.append('num_questions', numQuestions.toString());
+    formData.append('difficulty', difficulty);
+    
+    const response = await api.post('/quiz/generate/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to generate quiz');
+  }
+};
+
+/**
+ * Generate flashcards from topic or document
+ * @param topic - The topic or text content
+ * @param numCards - Number of flashcards to generate (default: 10)
+ * @param document - Optional document file
+ */
+export const generateFlashcards = async (
+  topic: string, 
+  numCards: number = 10,
+  document?: any
+) => {
+  try {
+    const formData = new FormData();
+    
+    if (document) {
+      // For web, document might already be a File object
+      if (Platform.OS === 'web' && document.file) {
+        formData.append('document', document.file);
+      } else if (Platform.OS === 'web' && document instanceof File) {
+        formData.append('document', document);
+      } else {
+        // For mobile platforms
+        const documentFile = {
+          uri: document.uri,
+          type: document.mimeType || document.type || 'application/octet-stream',
+          name: document.name || 'document',
+        } as any;
+        formData.append('document', documentFile);
+      }
+    } else {
+      formData.append('topic', topic);
+    }
+    
+    formData.append('num_cards', numCards.toString());
+    
+    const response = await api.post('/flashcards/generate/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to generate flashcards');
+  }
+};
+
+/**
+ * Generate comprehensive study material from document or text
+ * Extracts: Topics, Concepts, Study Notes, Sample Questions
+ * @param text - Text content (for direct text input)
+ * @param document - Optional document file (.txt, .jpg, .png, .pdf)
+ */
+export const generateStudyMaterial = async (
+  text?: string,
+  document?: any
+) => {
+  try {
+    const formData = new FormData();
+    
+    if (document) {
+      // For web, document might already be a File object
+      if (Platform.OS === 'web' && document.file) {
+        formData.append('document', document.file);
+      } else if (Platform.OS === 'web' && document instanceof File) {
+        formData.append('document', document);
+      } else {
+        // For mobile platforms
+        const documentFile = {
+          uri: document.uri,
+          type: document.mimeType || document.type || 'application/octet-stream',
+          name: document.name || 'document',
+        } as any;
+        formData.append('document', documentFile);
+      }
+    } else if (text) {
+      formData.append('text', text);
+    } else {
+      throw new Error('Please provide either text or a document');
+    }
+    
+    const response = await api.post('/study-material/generate/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to generate study material');
+  }
+};
+
+/**
+ * Summarize YouTube video
+ * @param videoUrl - YouTube video URL
+ * @param useDemo - Use demo mode for testing UI (optional)
+ */
+export const summarizeYouTubeVideo = async (videoUrl: string, useDemo: boolean = false) => {
+  try {
+    const url = useDemo ? '/youtube/summarize/?demo=true' : '/youtube/summarize/';
+    const response = await api.post(url, {
+      video_url: videoUrl,
+    }, {
+      timeout: 60000, // 60 seconds for real video processing
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to summarize video');
+  }
+};
+
+/**
+ * Check YouTube summarizer service health
+ */
+export const checkYouTubeHealth = async () => {
+  try {
+    const response = await api.get('/youtube/health/');
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'YouTube health check failed');
+  }
+};
+
+/**
+ * Generate predicted important questions from topic or document
+ * @param topic - Topic name (for text-based generation)
+ * @param examType - Type of exam (General, JEE, NEET, etc.)
+ * @param numQuestions - Number of questions (default: 5)
+ * @param document - Optional document file
+ */
+export const generatePredictedQuestions = async (
+  topic?: string,
+  examType: string = 'General',
+  numQuestions: number = 5,
+  document?: any
+) => {
+  try {
+    const formData = new FormData();
+    
+    if (document) {
+      // For web, document might already be a File object
+      if (Platform.OS === 'web' && document.file) {
+        formData.append('document', document.file);
+      } else if (Platform.OS === 'web' && document instanceof File) {
+        formData.append('document', document);
+      } else {
+        // For mobile platforms
+        const documentFile = {
+          uri: document.uri,
+          type: document.mimeType || document.type || 'application/octet-stream',
+          name: document.name || 'document',
+        } as any;
+        formData.append('document', documentFile);
+      }
+    } else if (topic) {
+      formData.append('topic', topic);
+    } else {
+      throw new Error('Please provide either a topic or document');
+    }
+    
+    formData.append('exam_type', examType);
+    formData.append('num_questions', numQuestions.toString());
+    
+    const response = await api.post('/predicted-questions/generate/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 60000, // 60 seconds for AI generation
+    });
+    
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to generate predicted questions');
+  }
+};
+
+/**
+ * SUBSCRIPTION & PRICING APIs
+ */
+
+/**
+ * Get user's current subscription status
+ * @param userId - Unique user identifier (device ID or email)
+ */
+export const getSubscriptionStatus = async (userId: string) => {
+  try {
+    const response = await api.get('/subscription/status/', {
+      params: { user_id: userId }
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get subscription status');
+  }
+};
+
+/**
+ * Upgrade user to premium plan
+ * @param userId - User identifier
+ * @param autoPayEnabled - Enable auto-pay renewal
+ * @param paymentMethod - Payment method (card, upi, wallet)
+ */
+export const upgradeToPremium = async (
+  userId: string,
+  autoPayEnabled: boolean = true,
+  paymentMethod: string = 'card'
+) => {
+  try {
+    const response = await api.post('/subscription/upgrade/', {
+      user_id: userId,
+      auto_pay_enabled: autoPayEnabled,
+      payment_method: paymentMethod,
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to upgrade plan');
+  }
+};
+
+/**
+ * Manage auto-pay settings
+ * @param userId - User identifier
+ * @param enable - Enable or disable auto-pay
+ */
+export const manageAutoPay = async (userId: string, enable: boolean) => {
+  try {
+    const response = await api.post('/subscription/autopay/', {
+      user_id: userId,
+      enable: enable,
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to manage auto-pay');
+  }
+};
+
+/**
+ * Check if user can access a feature
+ * @param userId - User identifier
+ * @param feature - Feature name (ask_questions, quiz, flashcards)
+ */
+export const checkFeatureAccess = async (userId: string, feature: string) => {
+  try {
+    const response = await api.get('/subscription/feature-access/', {
+      params: {
+        user_id: userId,
+        feature: feature,
+      }
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to check feature access');
+  }
+};
+
+/**
+ * Log feature usage
+ * @param userId - User identifier
+ * @param feature - Feature name
+ * @param type - Usage type (image, text, file)
+ * @param inputSize - Size of input in characters/bytes
+ */
+export const logFeatureUsage = async (
+  userId: string,
+  feature: string,
+  type: string = 'text',
+  inputSize: number = 0
+) => {
+  try {
+    const response = await api.post('/subscription/log-usage/', {
+      user_id: userId,
+      feature: feature,
+      type: type,
+      input_size: inputSize,
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to log usage');
+  }
+};
+
+/**
+ * Get user's billing history
+ * @param userId - User identifier
+ */
+export const getBillingHistory = async (userId: string) => {
+  try {
+    const response = await api.get('/subscription/billing-history/', {
+      params: { user_id: userId }
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get billing history');
+  }
+};
+
 export default api;
+

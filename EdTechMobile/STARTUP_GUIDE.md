@@ -12,7 +12,7 @@ Before starting, ensure you have:
 - ✅ API keys configured in `backend/.env` file
 - ✅ Node.js and npm installed for mobile app
 
-## 🎯 Step-by-Step Launch
+##  Step-by-Step Launch
 
 ### 1. Start the Backend Server
 
@@ -163,7 +163,7 @@ npm install
 ## 🎨 App Features
 
 - ✨ **Dual Input Modes**: Text typing or image upload
-- 🎯 **Smart OCR**: Extracts text from images using EasyOCR
+-  **Smart OCR**: Extracts text from images using EasyOCR
 - 🔍 **Web Search**: Finds relevant educational content
 - 📚 **Content Scraping**: Fetches full article content
 - 🎥 **YouTube Integration**: Suggests educational videos

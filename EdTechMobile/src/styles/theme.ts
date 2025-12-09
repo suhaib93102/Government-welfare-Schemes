@@ -19,6 +19,8 @@ export const colors = {
   successLight: '#dcfce7',
   error: '#dc2626',
   errorLight: '#fee2e2',
+  warning: '#f59e0b',
+  warningLight: '#fef3c7',
   white: '#ffffff',
   blue50: '#eff6ff',
   blue100: '#dbeafe',

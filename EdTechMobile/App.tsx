@@ -15,14 +15,34 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { TextInputComponent } from './src/components/TextInput';
 import { ImageUpload } from './src/components/ImageUpload';
+import { FileUpload } from './src/components/FileUpload';
 import { Results } from './src/components/Results';
 import { Questions } from './src/components/Questions';
 import { Solutions } from './src/components/Solutions';
-import { solveQuestionByText, solveQuestionByImage, checkHealth } from './src/services/api';
+import { Quiz } from './src/components/Quiz';
+import { Flashcard } from './src/components/Flashcard';
+import { StudyMaterial } from './src/components/StudyMaterial';
+import { PredictedQuestions } from './src/components/PredictedQuestions';
+import { YouTubeSummarizer } from './src/components/YouTubeSummarizer';
+import { Pricing } from './src/components/Pricing';
+import { AuthScreen } from './src/components/AuthScreen';
+import { LandingPageDashboard } from './src/components/LandingPageDashboard';
+import { MainDashboard } from './src/components/MainDashboard';
+import { solveQuestionByText, solveQuestionByImage, checkHealth, generateQuiz, generateFlashcards, generateStudyMaterial, summarizeYouTubeVideo, generatePredictedQuestions } from './src/services/api';
 import { colors, spacing, borderRadius, typography, shadows } from './src/styles/theme';
 
 type TabType = 'text' | 'image';
-type PageType = 'dashboard' | 'projects' | 'questions' | 'solutions' | 'ask' | 'subjects' | 'settings' | 'profile';
+type PageType = 'dashboard' | 'quiz' | 'flashcards' | 'ask' | 'predicted-questions' | 'youtube-summarizer' | 'pricing' | 'profile';
+type DashboardSection = 'overview' | 'quiz' | 'flashcards' | 'study-material';
+type AppScreenType = 'auth' | 'landing' | 'main';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  provider: 'google' | 'email';
+  avatar?: string | null;
+}
 
 const { width: initialWidth } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -32,9 +52,12 @@ const isWeb = Platform.OS === 'web';
 
 const navItems = [
   { id: 'dashboard' as PageType, label: 'Dashboard', icon: 'dashboard' },
-  { id: 'questions' as PageType, label: 'My Questions', icon: 'help' },
-  { id: 'ask' as PageType, label: 'Ask Question', icon: 'add-circle' },
-  { id: 'subjects' as PageType, label: 'Subjects', icon: 'menu-book' },
+  { id: 'quiz' as PageType, label: 'Quiz', icon: 'quiz' },
+  { id: 'flashcards' as PageType, label: 'Flashcards', icon: 'style' },
+  { id: 'ask' as PageType, label: 'Ask Question', icon: 'help' },
+  { id: 'predicted-questions' as PageType, label: 'Predicted Questions', icon: 'auto-awesome' },
+  { id: 'youtube-summarizer' as PageType, label: 'YouTube Summarizer', icon: 'ondemand-video' },
+  { id: 'pricing' as PageType, label: 'Pricing', icon: 'local-offer' },
   { id: 'profile' as PageType, label: 'Profile', icon: 'account-circle' },
 ];
 
@@ -45,6 +68,11 @@ const heroStats = [
 ];
 
 export default function App() {
+  // Authentication State
+  const [appScreen, setAppScreen] = useState<AppScreenType>('landing');
+  const [user, setUser] = useState<User | null>(null);
+  const [showLanding, setShowLanding] = useState(true);
+
   const [screenWidth, setScreenWidth] = useState(initialWidth);
   const [activeTab, setActiveTab] = useState<TabType>('text');
   const [loading, setLoading] = useState(false);
@@ -52,6 +80,37 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<PageType>('ask');
   const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [dashboardSection, setDashboardSection] = useState<DashboardSection>('overview');
+  const [quizData, setQuizData] = useState<any>(null);
+  const [flashcardData, setFlashcardData] = useState<any>(null);
+  const [studyMaterialData, setStudyMaterialData] = useState<any>(null);
+  const [predictedQuestionsData, setPredictedQuestionsData] = useState<any>(null);
+  const [youtubeSummaryData, setYoutubeSummaryData] = useState<any>(null);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [flashcardLoading, setFlashcardLoading] = useState(false);
+  const [studyMaterialLoading, setStudyMaterialLoading] = useState(false);
+  const [predictedQuestionsLoading, setPredictedQuestionsLoading] = useState(false);
+  const [youtubeSummaryLoading, setYoutubeSummaryLoading] = useState(false);
+
+  // Authentication Handlers
+  const handleAuthSuccess = (userInfo: User) => {
+    setUser(userInfo);
+    setAppScreen('main');
+    setShowLanding(false);
+    setCurrentPage('dashboard');
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setAppScreen('landing');
+    setShowLanding(true);
+    setResults(null);
+    setQuizData(null);
+    setFlashcardData(null);
+    setStudyMaterialData(null);
+    setPredictedQuestionsData(null);
+    setYoutubeSummaryData(null);
+  };
 
   useEffect(() => {
     checkApiHealth();
@@ -100,7 +159,7 @@ export default function App() {
     setResults(null);
 
     try {
-      const response = await solveQuestionByImage(imageUri);
+      const response = await solveQuestionByImage(imageUri, 5);
       setResults(response);
       setLoading(false);
     } catch (error: any) {
@@ -113,47 +172,183 @@ export default function App() {
     setDrawerOpen((prev) => (open === undefined ? !prev : open));
   };
 
+  const handleGenerateQuiz = async (topic: string, numQuestions: number = 5, difficulty: string = 'medium') => {
+    if (!topic.trim()) {
+      Alert.alert('Error', 'Please enter a topic');
+      return;
+    }
+
+    setQuizLoading(true);
+    setQuizData(null);
+
+    try {
+      const response = await generateQuiz(topic, numQuestions, difficulty);
+      setQuizData(response);
+      setQuizLoading(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to generate quiz');
+      setQuizLoading(false);
+    }
+  };
+
+  const handleGenerateQuizFromFile = async (files: any[], numQuestions: number = 5, difficulty: string = 'medium') => {
+    if (!files || files.length === 0) {
+      Alert.alert('Error', 'Please select a file');
+      return;
+    }
+    
+    setQuizLoading(true);
+    setQuizData(null);
+
+    try {
+      // Use first file for now (backend supports single file)
+      const response = await generateQuiz('', numQuestions, difficulty, files[0]);
+      setQuizData(response);
+      setQuizLoading(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to generate quiz from file');
+      setQuizLoading(false);
+    }
+  };
+
+  const handleGenerateFlashcards = async (topic: string, numCards: number = 10) => {
+    if (!topic.trim()) {
+      Alert.alert('Error', 'Please enter a topic');
+      return;
+    }
+
+    setFlashcardLoading(true);
+    setFlashcardData(null);
+
+    try {
+      const response = await generateFlashcards(topic, numCards);
+      setFlashcardData(response);
+      setFlashcardLoading(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to generate flashcards');
+      setFlashcardLoading(false);
+    }
+  };
+
+  const handleGenerateFlashcardsFromFile = async (files: any[], numCards: number = 10) => {
+    if (!files || files.length === 0) {
+      Alert.alert('Error', 'Please select a file');
+      return;
+    }
+    
+    setFlashcardLoading(true);
+    setFlashcardData(null);
+
+    try {
+      // Use first file for now (backend supports single file)
+      const response = await generateFlashcards('', numCards, files[0]);
+      setFlashcardData(response);
+      setFlashcardLoading(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to generate flashcards from file');
+      setFlashcardLoading(false);
+    }
+  };
+
+  const handleGenerateStudyMaterial = async (text: string) => {
+    if (!text.trim()) {
+      Alert.alert('Error', 'Please enter text or upload a document');
+      return;
+    }
+
+    setStudyMaterialLoading(true);
+    setStudyMaterialData(null);
+
+    try {
+      const response = await generateStudyMaterial(text);
+      setStudyMaterialData(response);
+      setStudyMaterialLoading(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to generate study material');
+      setStudyMaterialLoading(false);
+    }
+  };
+
+  const handleGenerateStudyMaterialFromFile = async (files: any[]) => {
+    if (!files || files.length === 0) {
+      Alert.alert('Error', 'Please select a file');
+      return;
+    }
+    
+    setStudyMaterialLoading(true);
+    setStudyMaterialData(null);
+
+    try {
+      // Use first file for now (backend supports single file)
+      const response = await generateStudyMaterial(undefined, files[0]);
+      setStudyMaterialData(response);
+      setStudyMaterialLoading(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to generate study material from file');
+      setStudyMaterialLoading(false);
+    }
+  };
+
+  const handleGeneratePredictedQuestions = async (topic: string, examType: string = 'General') => {
+    if (!topic.trim()) {
+      Alert.alert('Error', 'Please enter a topic or subject');
+      return;
+    }
+
+    setPredictedQuestionsLoading(true);
+    setPredictedQuestionsData(null);
+
+    try {
+      const response = await generatePredictedQuestions(topic, examType, 5);
+      setPredictedQuestionsData(response);
+      setPredictedQuestionsLoading(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to generate predicted questions');
+      setPredictedQuestionsLoading(false);
+    }
+  };
+
+  const handleGeneratePredictedQuestionsFromFile = async (files: any[], examType: string = 'General') => {
+    if (!files || files.length === 0) {
+      Alert.alert('Error', 'Please select a file');
+      return;
+    }
+    
+    setPredictedQuestionsLoading(true);
+    setPredictedQuestionsData(null);
+
+    try {
+      const response = await generatePredictedQuestions(undefined, examType, 5, files[0]);
+      setPredictedQuestionsData(response);
+      setPredictedQuestionsLoading(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to generate predicted questions from file');
+      setPredictedQuestionsLoading(false);
+    }
+  };
+
+  const handleSummarizeYouTubeVideo = async (videoUrl: string) => {
+    if (!videoUrl.trim()) {
+      Alert.alert('Error', 'Please enter a valid YouTube URL');
+      return;
+    }
+
+    setYoutubeSummaryLoading(true);
+    setYoutubeSummaryData(null);
+
+    try {
+      const response = await summarizeYouTubeVideo(videoUrl, false);
+      setYoutubeSummaryData(response);
+      setYoutubeSummaryLoading(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to summarize YouTube video');
+      setYoutubeSummaryLoading(false);
+    }
+  };
+
   const renderSidebar = () => {
-    // compute sidebar width for different breakpoints
-    const sidebarWidth = screenWidth >= 1280 ? 240 : screenWidth >= 768 ? 200 : 240;
-    return (
-      <View style={[styles.sidebar, { width: sidebarWidth, minWidth: sidebarWidth }]}>
-      <View style={styles.userProfile}>
-        <View style={styles.avatar}>
-          <MaterialIcons name="account-circle" size={64} color={colors.primary} />
-        </View>
-        <Text style={styles.userName}>Student User</Text>
-        <Text style={styles.userRole}>Learner</Text>
-      </View>
-
-      <View style={styles.navMenu}>
-        {navItems.map((item) => (
-          <TouchableOpacity
-            key={item.id}
-            style={[styles.navItem, currentPage === item.id && styles.navItemActive]}
-            onPress={() => setCurrentPage(item.id)}
-          >
-            <MaterialIcons 
-              name={item.icon as any} 
-              size={20} 
-              color={currentPage === item.id ? colors.primary : colors.textMuted} 
-            />
-            <Text style={[
-              styles.navText,
-              currentPage === item.id && styles.navTextActive
-            ]}>
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <TouchableOpacity style={styles.upgradeButton}>
-        <MaterialIcons name="workspace-premium" size={20} color={colors.white} />
-        <Text style={styles.upgradeText}>Upgrade Plan</Text>
-      </TouchableOpacity>
-    </View>
-    );
+    // This function is no longer used - replaced by renderSidebarWithLogout
+    return null;
   };
 
   const renderMainContent = () => {
@@ -258,15 +453,366 @@ export default function App() {
       )}
 
       {/* If the app page is Questions or Solutions, show that view instead of the ask input */}
-      {currentPage === 'questions' ? (
-        <View style={{ padding: spacing.xl }}>
-          <Questions />
+      {currentPage === 'dashboard' ? (
+        <View style={{ flex: 1, padding: spacing.lg }}>
+          {/* Dashboard Sections Tabs */}
+          <View style={styles.dashboardTabsContainer}>
+            <TouchableOpacity
+              style={[styles.dashboardTab, dashboardSection === 'overview' && styles.dashboardTabActive]}
+              onPress={() => setDashboardSection('overview')}
+            >
+              <MaterialIcons 
+                name="dashboard" 
+                size={20} 
+                color={dashboardSection === 'overview' ? colors.primary : colors.textMuted} 
+              />
+              <Text style={[styles.dashboardTabText, dashboardSection === 'overview' && styles.dashboardTabTextActive]}>
+                Overview
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.dashboardTab, dashboardSection === 'quiz' && styles.dashboardTabActive]}
+              onPress={() => setDashboardSection('quiz')}
+            >
+              <MaterialIcons 
+                name="quiz" 
+                size={20} 
+                color={dashboardSection === 'quiz' ? colors.primary : colors.textMuted} 
+              />
+              <Text style={[styles.dashboardTabText, dashboardSection === 'quiz' && styles.dashboardTabTextActive]}>
+                Quiz
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.dashboardTab, dashboardSection === 'flashcards' && styles.dashboardTabActive]}
+              onPress={() => setDashboardSection('flashcards')}
+            >
+              <MaterialIcons 
+                name="style" 
+                size={20} 
+                color={dashboardSection === 'flashcards' ? colors.primary : colors.textMuted} 
+              />
+              <Text style={[styles.dashboardTabText, dashboardSection === 'flashcards' && styles.dashboardTabTextActive]}>
+                Flashcards
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.dashboardTab, dashboardSection === 'study-material' && styles.dashboardTabActive]}
+              onPress={() => setDashboardSection('study-material')}
+            >
+              <MaterialIcons 
+                name="school" 
+                size={20} 
+                color={dashboardSection === 'study-material' ? colors.primary : colors.textMuted} 
+              />
+              <Text style={[styles.dashboardTabText, dashboardSection === 'study-material' && styles.dashboardTabTextActive]}>
+                Study Material
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Dashboard Content */}
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            {dashboardSection === 'overview' && (
+              <View style={styles.overviewContainer}>
+                <View style={styles.featureCard}>
+                  <MaterialIcons name="quiz" size={48} color={colors.primary} />
+                  <Text style={styles.featureTitle}>Generate Quiz</Text>
+                  <Text style={styles.featureDescription}>
+                    Create interactive quizzes from any topic or document
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.featureButton}
+                    onPress={() => setDashboardSection('quiz')}
+                  >
+                    <Text style={styles.featureButtonText}>Start Quiz</Text>
+                    <MaterialIcons name="arrow-forward" size={20} color={colors.white} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.featureCard}>
+                  <MaterialIcons name="style" size={48} color={colors.success} />
+                  <Text style={styles.featureTitle}>Study Flashcards</Text>
+                  <Text style={styles.featureDescription}>
+                    Master concepts with AI-generated flashcards
+                  </Text>
+                  <TouchableOpacity 
+                    style={[styles.featureButton, { backgroundColor: colors.success }]}
+                    onPress={() => setDashboardSection('flashcards')}
+                  >
+                    <Text style={styles.featureButtonText}>Create Flashcards</Text>
+                    <MaterialIcons name="arrow-forward" size={20} color={colors.white} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.featureCard}>
+                  <MaterialIcons name="school" size={48} color={colors.error} />
+                  <Text style={styles.featureTitle}>Study Material</Text>
+                  <Text style={styles.featureDescription}>
+                    Extract topics, concepts, notes, and questions from sample papers
+                  </Text>
+                  <TouchableOpacity 
+                    style={[styles.featureButton, { backgroundColor: colors.error }]}
+                    onPress={() => setDashboardSection('study-material')}
+                  >
+                    <Text style={styles.featureButtonText}>Generate Material</Text>
+                    <MaterialIcons name="arrow-forward" size={20} color={colors.white} />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.featureCard}>
+                  <MaterialIcons name="search" size={48} color={colors.warning} />
+                  <Text style={styles.featureTitle}>Ask Questions</Text>
+                  <Text style={styles.featureDescription}>
+                    Get instant answers to any question with AI
+                  </Text>
+                  <TouchableOpacity 
+                    style={[styles.featureButton, { backgroundColor: colors.warning }]}
+                    onPress={() => setCurrentPage('ask')}
+                  >
+                    <Text style={styles.featureButtonText}>Ask Now</Text>
+                    <MaterialIcons name="arrow-forward" size={20} color={colors.white} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {dashboardSection === 'quiz' && (
+              <View style={styles.sectionContainer}>
+                {!quizData && !quizLoading && (
+                  <View style={styles.inputSection}>
+                    <Text style={styles.sectionTitle}>Generate Quiz</Text>
+                    <TextInputComponent 
+                      onSubmit={(topic) => handleGenerateQuiz(topic, 5, 'medium')} 
+                      loading={quizLoading}
+                      placeholder="Enter a topic (e.g., Photosynthesis, World War 2, Python programming)"
+                    />
+
+                    <Text style={styles.orText}>— or —</Text>
+
+                    <FileUpload
+                      onSubmit={(file) => handleGenerateQuizFromFile(file, 5, 'medium')}
+                      loading={quizLoading}
+                      placeholder="Upload a PDF/TXT/Image to generate a quiz"
+                    />
+                  </View>
+                )}
+                <Quiz quizData={quizData} loading={quizLoading} />
+                {quizData && (
+                  <TouchableOpacity 
+                    style={styles.newContentButton}
+                    onPress={() => setQuizData(null)}
+                  >
+                    <MaterialIcons name="add" size={20} color={colors.white} />
+                    <Text style={styles.newContentButtonText}>Generate New Quiz</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {dashboardSection === 'flashcards' && (
+              <View style={styles.sectionContainer}>
+                {!flashcardData && !flashcardLoading && (
+                  <View style={styles.inputSection}>
+                    <Text style={styles.sectionTitle}>Generate Flashcards</Text>
+                    <TextInputComponent 
+                      onSubmit={(topic) => handleGenerateFlashcards(topic, 10)} 
+                      loading={flashcardLoading}
+                      placeholder="Enter a topic (e.g., Spanish vocabulary, Chemistry formulas, History dates)"
+                    />
+
+                    <Text style={styles.orText}>— or —</Text>
+
+                    <FileUpload
+                      onSubmit={(file) => handleGenerateFlashcardsFromFile(file, 10)}
+                      loading={flashcardLoading}
+                      placeholder="Upload a PDF/TXT/Image to generate flashcards"
+                    />
+                  </View>
+                )}
+                <Flashcard flashcardData={flashcardData} loading={flashcardLoading} />
+                {flashcardData && (
+                  <TouchableOpacity 
+                    style={styles.newContentButton}
+                    onPress={() => setFlashcardData(null)}
+                  >
+                    <MaterialIcons name="add" size={20} color={colors.white} />
+                    <Text style={styles.newContentButtonText}>Generate New Flashcards</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {dashboardSection === 'study-material' && (
+              <View style={styles.sectionContainer}>
+                {!studyMaterialData && !studyMaterialLoading && (
+                  <View style={styles.inputSection}>
+                    <Text style={styles.sectionTitle}>Generate Study Material</Text>
+                    <Text style={styles.sectionSubtitle}>
+                      Upload a sample paper or paste text to extract important topics, concepts, study notes, and practice questions
+                    </Text>
+                    <TextInputComponent 
+                      onSubmit={handleGenerateStudyMaterial} 
+                      loading={studyMaterialLoading}
+                      placeholder="Paste sample paper text or upload a document"
+                    />
+
+                    <Text style={styles.orText}>— or —</Text>
+
+                    <FileUpload
+                      onSubmit={(file) => handleGenerateStudyMaterialFromFile(file)}
+                      loading={studyMaterialLoading}
+                      placeholder="Upload PDF/TXT/Image to extract study material"
+                    />
+                  </View>
+                )}
+                <StudyMaterial studyMaterialData={studyMaterialData} loading={studyMaterialLoading} />
+                {studyMaterialData && (
+                  <TouchableOpacity 
+                    style={styles.newContentButton}
+                    onPress={() => setStudyMaterialData(null)}
+                  >
+                    <MaterialIcons name="add" size={20} color={colors.white} />
+                    <Text style={styles.newContentButtonText}>Generate New Study Material</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </ScrollView>
         </View>
-      ) : currentPage === 'solutions' ? (
-        <View style={{ padding: spacing.xl }}>
-          <Solutions />
+      ) : currentPage === 'quiz' ? (
+        <View style={{ flex: 1, padding: spacing.lg }}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <View style={styles.sectionContainer}>
+              {!quizData && !quizLoading && (
+                <View style={styles.inputSection}>
+                  <Text style={styles.sectionTitle}>Generate Quiz</Text>
+                  <TextInputComponent 
+                    onSubmit={(topic) => handleGenerateQuiz(topic, 5, 'medium')} 
+                    loading={quizLoading}
+                    placeholder="Enter a topic (e.g., Photosynthesis, World War 2, Python programming)"
+                  />
+
+                  <Text style={styles.orText}>— or —</Text>
+
+                  <FileUpload
+                    onSubmit={(file) => handleGenerateQuizFromFile(file, 5, 'medium')}
+                    loading={quizLoading}
+                    placeholder="Upload a PDF/TXT/Image to generate a quiz"
+                  />
+                </View>
+              )}
+              <Quiz quizData={quizData} loading={quizLoading} />
+              {quizData && (
+                <TouchableOpacity 
+                  style={styles.newContentButton}
+                  onPress={() => setQuizData(null)}
+                >
+                  <MaterialIcons name="add" size={20} color={colors.white} />
+                  <Text style={styles.newContentButtonText}>Generate New Quiz</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </ScrollView>
         </View>
-      ) : (
+      ) : currentPage === 'flashcards' ? (
+        <View style={{ flex: 1, padding: spacing.lg }}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <View style={styles.sectionContainer}>
+              {!flashcardData && !flashcardLoading && (
+                <View style={styles.inputSection}>
+                  <Text style={styles.sectionTitle}>Generate Flashcards</Text>
+                  <TextInputComponent 
+                    onSubmit={(topic) => handleGenerateFlashcards(topic, 10)} 
+                    loading={flashcardLoading}
+                    placeholder="Enter a topic (e.g., Spanish vocabulary, Chemistry formulas, History dates)"
+                  />
+
+                  <Text style={styles.orText}>— or —</Text>
+
+                  <FileUpload
+                    onSubmit={(file) => handleGenerateFlashcardsFromFile(file, 10)}
+                    loading={flashcardLoading}
+                    placeholder="Upload a PDF/TXT/Image to generate flashcards"
+                  />
+                </View>
+              )}
+              <Flashcard flashcardData={flashcardData} loading={flashcardLoading} />
+              {flashcardData && (
+                <TouchableOpacity 
+                  style={styles.newContentButton}
+                  onPress={() => setFlashcardData(null)}
+                >
+                  <MaterialIcons name="add" size={20} color={colors.white} />
+                  <Text style={styles.newContentButtonText}>Generate New Flashcards</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      ) : currentPage === 'predicted-questions' ? (
+        <View style={{ flex: 1, padding: spacing.lg }}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <View style={styles.sectionContainer}>
+              {!predictedQuestionsData && !predictedQuestionsLoading && (
+                <View style={styles.inputSection}>
+                  <Text style={styles.sectionTitle}>Get Predicted Important Questions</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    Enter a subject or topic to generate likely exam questions based on importance and difficulty
+                  </Text>
+                  <TextInputComponent 
+                    onSubmit={(topic) => handleGeneratePredictedQuestions(topic, 'General')} 
+                    loading={predictedQuestionsLoading}
+                    placeholder="Enter a subject or topic (e.g., Machine Learning, Organic Chemistry)"
+                  />
+
+                  <Text style={styles.orText}>— or —</Text>
+
+                  <FileUpload
+                    onSubmit={(file) => handleGeneratePredictedQuestionsFromFile(file, 'General')}
+                    loading={predictedQuestionsLoading}
+                    placeholder="Upload syllabus/notes to predict important questions"
+                  />
+                </View>
+              )}
+              <PredictedQuestions predictedQuestionsData={predictedQuestionsData} loading={predictedQuestionsLoading} />
+              {predictedQuestionsData && (
+                <TouchableOpacity 
+                  style={styles.newContentButton}
+                  onPress={() => setPredictedQuestionsData(null)}
+                >
+                  <MaterialIcons name="add" size={20} color={colors.white} />
+                  <Text style={styles.newContentButtonText}>Generate New Predictions</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      ) : currentPage === 'youtube-summarizer' ? (
+        <View style={{ flex: 1, padding: spacing.lg }}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <View style={styles.sectionContainer}>
+              <YouTubeSummarizer 
+                summaryData={youtubeSummaryData} 
+                loading={youtubeSummaryLoading}
+                onSubmit={handleSummarizeYouTubeVideo}
+              />
+              {youtubeSummaryData && (
+                <TouchableOpacity 
+                  style={styles.newContentButton}
+                  onPress={() => setYoutubeSummaryData(null)}
+                >
+                  <MaterialIcons name="add" size={20} color={colors.white} />
+                  <Text style={styles.newContentButtonText}>Summarize Another Video</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      ) : currentPage === 'ask' ? (
         <View style={{ flex: 1 }}>
           <View style={styles.tabContainer}>
             <TouchableOpacity
@@ -330,13 +876,64 @@ export default function App() {
             )}
           </ScrollView>
         </View>
-      )}
+      ) : currentPage === 'pricing' ? (
+        <View style={{ flex: 1 }}>
+          <Pricing />
+        </View>
+      ) : currentPage === 'profile' ? (
+        <View style={{ flex: 1, padding: spacing.lg }}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <View style={styles.profileContainer}>
+              <View style={styles.profileHeader}>
+                <MaterialIcons name="account-circle" size={100} color={colors.primary} />
+                <Text style={styles.profileName}>Student User</Text>
+                <Text style={styles.profileRole}>Learner</Text>
+              </View>
+              <View style={styles.profileStats}>
+                <View style={styles.profileStatCard}>
+                  <Text style={styles.profileStatValue}>24</Text>
+                  <Text style={styles.profileStatLabel}>Quizzes Taken</Text>
+                </View>
+                <View style={styles.profileStatCard}>
+                  <Text style={styles.profileStatValue}>156</Text>
+                  <Text style={styles.profileStatLabel}>Flashcards Studied</Text>
+                </View>
+                <View style={styles.profileStatCard}>
+                  <Text style={styles.profileStatValue}>89%</Text>
+                  <Text style={styles.profileStatLabel}>Avg Score</Text>
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      ) : null}
       </View>
     );
   };
 
   const showSidebar = isWeb && screenWidth >= 768;
 
+  // Render Auth Screen
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        {showLanding ? (
+          <LandingPageDashboard 
+            onNavigateToFeature={() => setShowLanding(false)}
+            onNavigateToPricing={() => {
+              setShowLanding(false);
+              setUser({ id: 'temp', name: 'Guest', email: 'guest@example.com', provider: 'email' });
+            }}
+          />
+        ) : (
+          <AuthScreen onAuthSuccess={handleAuthSuccess} />
+        )}
+      </SafeAreaView>
+    );
+  }
+
+  // Render Main App with user logged in
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
@@ -349,13 +946,13 @@ export default function App() {
         {/* Mobile drawer (slides in) */}
         {!showSidebar && drawerOpen && (
           <View style={[styles.sidebar, styles.sidebarDrawer]}>
-            {renderSidebar()}
+            {renderSidebarWithLogout()}
           </View>
         )}
 
         {showSidebar ? (
           <View style={styles.layoutWithSidebar}>
-            {renderSidebar()}
+            {renderSidebarWithLogout()}
             {renderMainContent()}
           </View>
         ) : (
@@ -364,6 +961,56 @@ export default function App() {
       </>
     </SafeAreaView>
   );
+
+  function renderSidebarWithLogout() {
+    // compute sidebar width for different breakpoints
+    const sidebarWidth = screenWidth >= 1280 ? 240 : screenWidth >= 768 ? 200 : 240;
+    return (
+      <View style={[styles.sidebar, { width: sidebarWidth, minWidth: sidebarWidth }]}>
+      <View style={styles.userProfile}>
+        <View style={styles.avatar}>
+          <MaterialIcons name="account-circle" size={64} color={colors.primary} />
+        </View>
+        <Text style={styles.userName}>{user?.name || 'User'}</Text>
+        <Text style={styles.userRole}>{user?.provider === 'google' ? 'Google User' : 'Learner'}</Text>
+      </View>
+
+      <View style={styles.navMenu}>
+        {navItems.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={[styles.navItem, currentPage === item.id && styles.navItemActive]}
+            onPress={() => setCurrentPage(item.id)}
+          >
+            <MaterialIcons 
+              name={item.icon as any} 
+              size={20} 
+              color={currentPage === item.id ? colors.primary : colors.textMuted} 
+            />
+            <Text style={[
+              styles.navText,
+              currentPage === item.id && styles.navTextActive
+            ]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.sidebarFooter}>
+        <TouchableOpacity style={styles.upgradeButton}>
+          <MaterialIcons name="workspace-premium" size={20} color={colors.white} />
+          <Text style={styles.upgradeText}>Upgrade Plan</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <MaterialIcons name="logout" size={20} color={colors.error} />
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+    );
+  }
 }
 
 const styles = StyleSheet.create({
@@ -435,6 +1082,27 @@ const styles = StyleSheet.create({
   upgradeText: {
     ...typography.h4,
     color: colors.white,
+  },
+  sidebarFooter: {
+    gap: spacing.md,
+    marginTop: 'auto',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    borderWidth: 2,
+    borderColor: colors.error,
+    backgroundColor: colors.error + '10',
+  },
+  logoutText: {
+    ...typography.body,
+    fontWeight: '600',
+    color: colors.error,
   },
   mainContent: {
     flex: 1,
@@ -542,10 +1210,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     zIndex: 60,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 6, height: 0 },
-    shadowRadius: 24,
+    boxShadow: '6px 0 24px rgba(0, 0, 0, 0.18)',
     elevation: 12,
     backgroundColor: colors.white,
   },
@@ -637,5 +1302,152 @@ const styles = StyleSheet.create({
   newQuestionText: {
     ...typography.h4,
     color: colors.white,
+  },
+  dashboardTabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.lg,
+    ...shadows.sm,
+  },
+  dashboardTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  dashboardTabActive: {
+    borderBottomColor: colors.primary,
+  },
+  dashboardTabText: {
+    ...typography.body,
+    color: colors.textMuted,
+  },
+  dashboardTabTextActive: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  overviewContainer: {
+    gap: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  featureCard: {
+    backgroundColor: colors.white,
+    padding: spacing.xl,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    ...shadows.md,
+  },
+  featureTitle: {
+    ...typography.h2,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  featureDescription: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  featureButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.md,
+    ...shadows.md,
+  },
+  featureButtonText: {
+    ...typography.h4,
+    color: colors.white,
+  },
+  sectionContainer: {
+    flex: 1,
+  },
+  inputSection: {
+    backgroundColor: colors.white,
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.lg,
+    ...shadows.sm,
+  },
+  sectionTitle: {
+    ...typography.h2,
+    marginBottom: spacing.md,
+  },
+  sectionSubtitle: {
+    ...typography.body,
+    color: colors.textMuted,
+    marginBottom: spacing.lg,
+    lineHeight: 20,
+  },
+  orText: {
+    textAlign: 'center',
+    marginVertical: spacing.md,
+    ...typography.body,
+    color: colors.textMuted,
+  },
+  newContentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.lg,
+    ...shadows.md,
+  },
+  newContentButtonText: {
+    ...typography.h4,
+    color: colors.white,
+  },
+  profileContainer: {
+    flex: 1,
+  },
+  profileHeader: {
+    backgroundColor: colors.white,
+    padding: spacing.xl * 2,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    ...shadows.sm,
+  },
+  profileName: {
+    ...typography.h1,
+    marginTop: spacing.md,
+  },
+  profileRole: {
+    ...typography.body,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
+  profileStats: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  profileStatCard: {
+    flex: 1,
+    backgroundColor: colors.white,
+    padding: spacing.lg,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  profileStatValue: {
+    ...typography.h1,
+    color: colors.primary,
+  },
+  profileStatLabel: {
+    ...typography.small,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+    textAlign: 'center',
   },
 });
