@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Dimensions, Alert, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
+import { TextInputComponent } from './TextInput';
+import { ImageUpload } from './ImageUpload';
+import { FileUpload } from './FileUpload';
+import AnimatedLoader from './AnimatedLoader';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -52,25 +56,77 @@ interface PredictedQuestionsData {
 interface PredictedQuestionsProps {
   predictedQuestionsData: PredictedQuestionsData | null;
   loading: boolean;
+  onTextSubmit?: (text: string) => void;
+  onImageSubmit?: (imageUri: string) => void;
+  onFileSubmit?: (files: any[]) => void;
 }
 
-export const PredictedQuestions: React.FC<PredictedQuestionsProps> = ({ predictedQuestionsData, loading }) => {
+export const PredictedQuestions: React.FC<PredictedQuestionsProps> = ({ predictedQuestionsData, loading, onTextSubmit, onImageSubmit, onFileSubmit }) => {
   const [expandedQuestions, setExpandedQuestions] = useState<number[]>([]);
   const [expandedDefinitions, setExpandedDefinitions] = useState<string[]>([]);
   const [showDefinitions, setShowDefinitions] = useState(true);
   const [showOutline, setShowOutline] = useState(true);
+  const [activeMethod, setActiveMethod] = useState<'text' | 'file'>('text');
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Generating comprehensive study material...</Text>
+        <AnimatedLoader visible={true} size="large" />
       </View>
     );
   }
 
   if (!predictedQuestionsData) {
-    return null;
+    return (
+      <ScrollView style={styles.emptyContainer} contentContainerStyle={styles.emptyContentContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.headerSection}>
+          <Image 
+            source={require('../../assets/Sitting Boy.png')} 
+            style={{ width: 80, height: 80, marginBottom: spacing.lg }}
+            resizeMode="contain"
+          />
+          <Text style={styles.headerTitle}>Predicted Important Questions</Text>
+          <Text style={styles.headerSubtitle}>
+            AI-powered predictions of likely exam questions based on importance and difficulty patterns
+          </Text>
+        </View>
+
+        <View style={styles.inputCard}>
+          <View style={styles.cardTabs}>
+            <TouchableOpacity
+              style={[styles.cardTab, styles.cardTabLeft, activeMethod === 'text' && styles.cardTabActive]}
+              onPress={() => setActiveMethod('text')}
+            >
+              <MaterialIcons name="text-fields" size={20} color={activeMethod === 'text' ? colors.white : colors.textMuted} />
+              <Text style={[styles.cardTabText, activeMethod === 'text' && styles.cardTabTextActive]}>Text Input</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.cardTab, activeMethod === 'file' && styles.cardTabActive, styles.cardTabRight]}
+              onPress={() => setActiveMethod('file')}
+            >
+              <MaterialIcons name="upload-file" size={18} color={activeMethod === 'file' ? colors.white : colors.textMuted} />
+              <Text style={[styles.cardTabText, activeMethod === 'file' && styles.cardTabTextActive]}>Document Upload</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.cardContent}>
+            {activeMethod === 'text' ? (
+              <TextInputComponent
+                onSubmit={(text) => onTextSubmit?.(text)}
+                placeholder="Paste your study material, notes, or topic content here..."
+              />
+            ) : (
+              <FileUpload
+                onSubmit={(files) => onFileSubmit?.(files)}
+                loading={loading}
+                placeholder="Upload syllabus/notes to predict important questions"
+              />
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    );
   }
 
   const toggleQuestion = (id: number) => {
@@ -852,5 +908,173 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.full,
     overflow: 'hidden',
+  },
+
+  // Empty state with vertical layout
+  emptyContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  emptyContentContainer: {
+    paddingBottom: spacing.xxxl,
+  },
+  headerSection: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    backgroundColor: colors.white,
+    marginBottom: spacing.md,
+  },
+  headerTitle: {
+    ...typography.h1,
+    fontSize: 26,
+    color: colors.text,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: spacing.md,
+    lineHeight: 22,
+  },
+  contentArea: {
+    paddingHorizontal: spacing.xl,
+  },
+  horizontalInputs: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'flex-start',
+  },
+  leftColumn: {
+    flex: 1.2,
+  },
+  rightColumn: {
+    flex: 1,
+  },
+  uploadSectionHorizontal: {
+    // Keep consistent with uploadSection but remove extra padding
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.xl,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  dividerText: {
+    ...typography.body,
+    color: colors.textMuted,
+    paddingHorizontal: spacing.lg,
+  },
+  uploadSection: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    padding: spacing.xxxl,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  // Card style for input with tabs
+  inputCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.lg,
+    borderRadius: borderRadius.xl,
+    padding: 0,
+    overflow: 'hidden',
+    ...shadows.sm,
+    marginBottom: spacing.lg,
+  },
+  cardTabs: {
+    flexDirection: 'row',
+    padding: spacing.sm,
+    gap: spacing.sm,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+  },
+  cardTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.lg * 1.1,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.xl,
+  },
+  cardTabLeft: {
+    flex: 1,
+    borderTopLeftRadius: borderRadius.xl,
+    borderBottomLeftRadius: 0,
+  },
+  cardTabRight: {
+    flex: 1,
+    borderTopRightRadius: borderRadius.xl,
+    borderBottomRightRadius: 0,
+  },
+  cardTabActive: {
+    backgroundColor: colors.primary,
+    ...shadows.lg,
+    transform: [{ translateY: -2 }],
+  },
+  cardTabText: {
+    ...typography.h4,
+    color: colors.textMuted,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  cardTabTextActive: {
+    color: colors.white,
+  },
+  cardContent: {
+    padding: spacing.lg,
+  },
+  uploadTitle: {
+    ...typography.h2,
+    fontSize: 20,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  uploadSubtitle: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  chooseFilesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.sm,
+    ...shadows.md,
+  },
+  chooseFilesText: {
+    ...typography.h4,
+    color: colors.white,
+    fontWeight: '600',
+  },
+  supportedFormats: {
+    ...typography.small,
+    color: colors.textMuted,
+    textAlign: 'center',
   },
 });

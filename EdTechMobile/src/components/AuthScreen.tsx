@@ -1,663 +1,953 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  ScrollView, 
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
   TextInput,
   Alert,
   ActivityIndicator,
-  Linking
+  KeyboardAvoidingView,
+  Platform,
+  Linking,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
-import * as SecureStore from 'expo-secure-store';
+import * as AuthSession from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
 import { googleAuthAPI } from '../services/authService';
+import AnimatedLoader from './AnimatedLoader';
+import { googleAuthConfig } from '../config/googleAuth';
+import { GoogleSignInButton } from './GoogleSignInButton';
 
 WebBrowser.maybeCompleteAuthSession();
 
+const HERO_METRICS = [
+  { label: 'Setup', value: '< 1 min' },
+  { label: 'Devices', value: 'Phone + Web' },
+  { label: 'Security', value: 'Google OAuth' },
+];
+
+const isClientIdConfigured = (id?: string) => Boolean(id && !id.includes('YOUR_') && id.trim().length > 0);
+
+const formatClientIdList = (items: string[]) => {
+  if (items.length === 0) {
+    return 'valid client IDs';
+  }
+  if (items.length === 1) {
+    return `${items[0]} client ID`;
+  }
+  const lastItem = items[items.length - 1];
+  return `${items.slice(0, -1).join(', ')} and ${lastItem} client IDs`;
+};
+
 interface AuthScreenProps {
-  onAuthSuccess: (userInfo: any) => void;
+  onAuthSuccess: (user: any) => void;
 }
 
-// Replace with your actual Google Client ID from GCP
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
-const GOOGLE_AUTH_URL = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=http://localhost:8081&response_type=code&scope=openid%20email%20profile`;
-
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
-  const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
-  const [loading, setLoading] = useState(false);
-  
-  // Login form
+  const [activeTab, setActiveTab] = useState<'login' | 'signup' | 'guest'>('login');
+  const [formLoading, setFormLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginPasswordVisible, setLoginPasswordVisible] = useState(false);
-  
-  // Signup form
+
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
   const [signupPasswordVisible, setSignupPasswordVisible] = useState(false);
   const [signupConfirmPasswordVisible, setSignupConfirmPasswordVisible] = useState(false);
+  
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
+  const redirectUri = useMemo(
+    () =>
+      AuthSession.makeRedirectUri({
+        scheme: googleAuthConfig.scheme,
+        path: googleAuthConfig.redirectPath,
+      }),
+    []
+  );
 
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    try {
-      // Open Google OAuth URL
-      const result = await WebBrowser.openAuthSessionAsync(GOOGLE_AUTH_URL, 'http://localhost:8081');
+  const baseClientId = useMemo(() => {
+    if (Platform.OS === 'ios' && isClientIdConfigured(googleAuthConfig.iosClientId)) {
+      return googleAuthConfig.iosClientId;
+    }
+    if (Platform.OS === 'android' && isClientIdConfigured(googleAuthConfig.androidClientId)) {
+      return googleAuthConfig.androidClientId;
+    }
+    if (Platform.OS === 'web' && isClientIdConfigured(googleAuthConfig.webClientId)) {
+      return googleAuthConfig.webClientId;
+    }
+    if (isClientIdConfigured(googleAuthConfig.expoClientId)) {
+      return googleAuthConfig.expoClientId;
+    }
+    return '';
+  }, []);
 
-      if (result.type === 'success') {
-        const url = result.url;
-        
-        // Extract authorization code from URL
-        const codeMatch = url.match(/code=([^&]+)/);
-        if (!codeMatch || !codeMatch[1]) {
-          Alert.alert('Error', 'Failed to get authorization code');
-          setLoading(false);
-          return;
-        }
+  const googleRequestConfig = useMemo<Partial<Google.GoogleAuthRequestConfig> | undefined>(() => {
+    if (!isClientIdConfigured(baseClientId)) {
+      return undefined;
+    }
 
-        const authCode = codeMatch[1];
+    return {
+      clientId: baseClientId,
+      iosClientId: googleAuthConfig.iosClientId || undefined,
+      androidClientId: googleAuthConfig.androidClientId || undefined,
+      webClientId: googleAuthConfig.webClientId || undefined,
+      redirectUri,
+      responseType: 'code',
+      scopes: ['openid', 'profile', 'email'],
+      selectAccount: true,
+    };
+  }, [baseClientId, redirectUri]);
 
-        // Exchange code for tokens with backend
-        const authResult = await googleAuthAPI.signInWithGoogle(authCode);
+  const googleConfigHints = useMemo(() => {
+    const missing: string[] = [];
+    const targets: Array<{ value?: string; label: string }> = [
+      { value: googleAuthConfig.expoClientId, label: 'Expo Go' },
+      { value: googleAuthConfig.androidClientId, label: 'Android' },
+      { value: googleAuthConfig.iosClientId, label: 'iOS' },
+      { value: googleAuthConfig.webClientId, label: 'Web' },
+    ];
 
-        if (authResult.success) {
-          Alert.alert(
-            'Success',
-            `Welcome, ${authResult.user.first_name || 'User'}!`,
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  onAuthSuccess(authResult.user);
-                },
-              },
-            ]
-          );
-        } else {
-          Alert.alert('Error', authResult.error || 'Failed to sign in with Google');
-        }
-      } else if (result.type === 'cancel') {
-        console.log('Google sign in was cancelled');
-      } else if (result.type === 'dismiss') {
-        console.log('Google sign in was dismissed');
+    targets.forEach(({ value, label }) => {
+      if (!isClientIdConfigured(value)) {
+        missing.push(label);
       }
+    });
 
-      setLoading(false);
+    return missing;
+  }, []);
+
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const handleGoogleAuthCode = async (authCode: string) => {
+    try {
+      const authResult = await googleAuthAPI.signInWithGoogle(authCode);
+      if (!authResult.success || !authResult.user) {
+        throw new Error(authResult.error || 'Unable to authenticate with Google');
+      }
+      onAuthSuccess({ ...authResult.user, provider: 'google' });
     } catch (error: any) {
-      console.error('Google sign in error:', error);
-      Alert.alert('Error', error.message || 'Failed to sign in with Google');
-      setLoading(false);
+      Alert.alert('Google Sign-In Failed', error?.message || 'Please try again in a moment.');
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
   const handleEmailLogin = async () => {
     if (!loginEmail || !loginPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert('Login Error', 'Please fill in both email and password fields.');
       return;
     }
 
     if (!validateEmail(loginEmail)) {
-      Alert.alert('Error', 'Please enter a valid email');
+      Alert.alert('Login Error', 'Please enter a valid email address.');
       return;
     }
 
-    setLoading(true);
     try {
+      setFormLoading(true);
       const result = await googleAuthAPI.login(loginEmail, loginPassword);
-
-      if (result.success) {
-        Alert.alert('Success', 'Logged in successfully', [
-          {
-            text: 'OK',
-            onPress: () => {
-              onAuthSuccess(result.user);
-            },
-          },
-        ]);
-      } else {
-        Alert.alert('Error', result.error || 'Login failed');
+      if (!result.success || !result.user) {
+        throw new Error(result.error || 'Login failed');
       }
+      onAuthSuccess(result.user);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Login failed');
+      Alert.alert('Login Failed', error?.message || 'Unable to log in. Please try again.');
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   };
 
   const handleEmailSignup = async () => {
     if (!signupName || !signupEmail || !signupPassword || !signupConfirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert('Sign Up Error', 'Please fill out every field.');
       return;
     }
 
     if (!validateEmail(signupEmail)) {
-      Alert.alert('Error', 'Please enter a valid email');
+      Alert.alert('Sign Up Error', 'Please enter a valid email address.');
       return;
     }
 
     if (signupPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      Alert.alert('Sign Up Error', 'Password must be at least 6 characters long.');
       return;
     }
 
     if (signupPassword !== signupConfirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      Alert.alert('Sign Up Error', 'Passwords do not match.');
       return;
     }
 
-    setLoading(true);
     try {
+      setFormLoading(true);
       const result = await googleAuthAPI.signUp(signupName, signupEmail, signupPassword);
-
-      if (result.success) {
-        Alert.alert('Success', 'Account created successfully', [
-          {
-            text: 'OK',
-            onPress: () => {
-              onAuthSuccess(result.user);
-            },
-          },
-        ]);
-      } else {
-        Alert.alert('Error', result.error || 'Sign up failed');
+      if (!result.success || !result.user) {
+        throw new Error(result.error || 'Unable to create account');
       }
+      onAuthSuccess(result.user);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Sign up failed');
+      Alert.alert('Sign Up Failed', error?.message || 'Unable to create your account right now.');
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   };
 
-  return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Hero Section */}
-      <View style={styles.heroSection}>
-        <View style={styles.logoContainer}>
-          <MaterialIcons name="school" size={60} color={colors.primary} />
-        </View>
-        <Text style={styles.appTitle}>ED Tech Solver</Text>
-        <Text style={styles.appSubtitle}>Master Your Studies with AI-Powered Learning</Text>
+  const handleGuestLogin = async () => {
+    if (!guestName || !guestEmail) {
+      Alert.alert('Guest Login Error', 'Please fill in your name and email.');
+      return;
+    }
+
+    if (!validateEmail(guestEmail)) {
+      Alert.alert('Guest Login Error', 'Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      setFormLoading(true);
+      // Guest login — pass guest user data to onAuthSuccess
+      onAuthSuccess({
+        name: guestName,
+        email: guestEmail,
+        isGuest: true,
+        provider: 'guest',
+      });
+    } catch (error: any) {
+      Alert.alert('Guest Login Failed', error?.message || 'Unable to proceed as guest.');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const renderGoogleButton = (label: string) => {
+    if (googleRequestConfig) {
+      return (
+        <GoogleSignInButton
+          config={googleRequestConfig}
+          onAuthCode={handleGoogleAuthCode}
+          loading={googleLoading}
+          setLoading={setGoogleLoading}
+          label={label}
+        />
+      );
+    }
+
+    return (
+      <TouchableOpacity 
+        style={styles.googleButton}
+        onPress={() => Alert.alert('Google Sign-In', 'Please configure Google OAuth in app.json')}
+      >
+        <MaterialIcons name="login" size={20} color="#4285F4" />
+        <Text style={styles.googleButtonText}>{label}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  // dev debug info to help diagnose why web Google login isn't opening
+  const renderGoogleDebug = () => {
+    if (!__DEV__) return null;
+    const client = googleRequestConfig?.clientId || googleAuthConfig.webClientId || '';
+    return (
+      <View style={{ marginTop: spacing.sm }}>
+        <Text style={{ fontSize: 12, color: client ? '#0f172a' : '#b91c1c' }}>
+          {client ? `Google client id detected (web): ${client.substring(0, 12)}...` : 'No Google client id detected for web. Set REACT_APP_GOOGLE_CLIENT_ID or update app.json.'}
+        </Text>
+        <Text style={{ fontSize: 12, color: '#64748b' }}>
+          Redirect URI: {redirectUri}
+        </Text>
+      </View>
+    );
+  };
+
+  const copyRedirectUri = async () => {
+    try {
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).clipboard?.writeText) {
+        await (navigator as any).clipboard.writeText(redirectUri);
+      } else {
+        // Fallback for native or environments without navigator.clipboard
+        // We can't guarantee expo-clipboard is installed here; show an alert with the URL so users can copy.
+        Alert.alert('Copy Redirect URI', redirectUri);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      Alert.alert('Unable to copy', 'Please copy the URL manually.');
+    }
+  };
+
+  const renderEmailLogin = () => (
+    <View style={styles.formSection}>
+      <Text style={styles.sectionTitle}>Welcome back</Text>
+      <Text style={styles.sectionSubtitle}>Pick up where you stopped.</Text>
+
+      {renderGoogleButton('Continue with Google')}
+
+      <View style={styles.dividerRow}>
+        <View style={styles.divider} />
+        <Text style={styles.dividerLabel}>or email</Text>
+        <View style={styles.divider} />
       </View>
 
-      {/* Features Preview */}
-      <View style={styles.featuresPreview}>
-        <View style={styles.featurePreviewItem}>
-          <MaterialIcons name="smart-toy" size={28} color={colors.primary} />
-          <Text style={styles.featurePreviewText}>AI-Powered Q&A</Text>
-        </View>
-        <View style={styles.featurePreviewItem}>
-          <MaterialIcons name="quiz" size={28} color={colors.primary} />
-          <Text style={styles.featurePreviewText}>Smart Quizzes</Text>
-        </View>
-        <View style={styles.featurePreviewItem}>
-          <MaterialIcons name="style" size={28} color={colors.primary} />
-          <Text style={styles.featurePreviewText}>Flashcards</Text>
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Email</Text>
+        <View style={styles.inputShell}>
+          <MaterialIcons name="mail" size={18} color={colors.textMuted} />
+          <TextInput
+            style={styles.input}
+            placeholder="student@domain.com"
+            value={loginEmail}
+            onChangeText={setLoginEmail}
+            placeholderTextColor={colors.textLight}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            editable={!formLoading}
+          />
         </View>
       </View>
 
-      {/* Tab Selector */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'login' && styles.tabActive]}
-          onPress={() => setActiveTab('login')}
-        >
-          <Text style={[styles.tabText, activeTab === 'login' && styles.tabTextActive]}>
-            Sign In
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'signup' && styles.tabActive]}
-          onPress={() => setActiveTab('signup')}
-        >
-          <Text style={[styles.tabText, activeTab === 'signup' && styles.tabTextActive]}>
-            Create Account
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Password</Text>
+        <View style={styles.inputShell}>
+          <MaterialIcons name="lock" size={18} color={colors.textMuted} />
+          <TextInput
+            style={styles.input}
+            placeholder="Enter password"
+            placeholderTextColor={colors.textLight}
+            value={loginPassword}
+            onChangeText={setLoginPassword}
+            secureTextEntry={!loginPasswordVisible}
+            editable={!formLoading}
+          />
+          <TouchableOpacity onPress={() => setLoginPasswordVisible((prev) => !prev)} disabled={formLoading}>
+            <MaterialIcons
+              name={loginPasswordVisible ? 'visibility' : 'visibility-off'}
+              size={18}
+              color={colors.textMuted}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Auth Forms */}
-      <View style={styles.formContainer}>
-        {activeTab === 'login' ? (
-          <View style={styles.form}>
-            <Text style={styles.formTitle}>Welcome Back</Text>
+      <TouchableOpacity style={styles.linkButton}>
+        <Text style={styles.linkButtonText}>Forgot password?</Text>
+      </TouchableOpacity>
 
-            {/* Google Sign-In Button */}
-            <TouchableOpacity
-              style={styles.googleButton}
-              onPress={handleGoogleSignIn}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color={colors.primary} />
-              ) : (
-                <>
-                  <MaterialIcons name="language" size={24} color={colors.primary} />
-                  <Text style={styles.googleButtonText}>Continue with Google</Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            {/* Divider */}
-            <View style={styles.dividerContainer}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.divider} />
-            </View>
-
-            {/* Email Input */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Email Address</Text>
-              <View style={styles.inputContainer}>
-                <MaterialIcons name="email" size={20} color={colors.textMuted} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="your@email.com"
-                  placeholderTextColor={colors.textMuted}
-                  value={loginEmail}
-                  onChangeText={setLoginEmail}
-                  editable={!loading}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-            </View>
-
-            {/* Password Input */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.inputContainer}>
-                <MaterialIcons name="lock" size={20} color={colors.textMuted} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your password"
-                  placeholderTextColor={colors.textMuted}
-                  value={loginPassword}
-                  onChangeText={setLoginPassword}
-                  editable={!loading}
-                  secureTextEntry={!loginPasswordVisible}
-                />
-                <TouchableOpacity
-                  onPress={() => setLoginPasswordVisible(!loginPasswordVisible)}
-                  disabled={loading}
-                >
-                  <MaterialIcons
-                    name={loginPasswordVisible ? 'visibility' : 'visibility-off'}
-                    size={20}
-                    color={colors.textMuted}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Sign In Button */}
-            <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleEmailLogin}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <>
-                  <Text style={styles.submitButtonText}>Sign In</Text>
-                  <MaterialIcons name="arrow-forward" size={20} color={colors.white} />
-                </>
-              )}
-            </TouchableOpacity>
-
-            {/* Forgot Password */}
-            <TouchableOpacity style={styles.forgotPassword}>
-              <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
-            </TouchableOpacity>
-          </View>
+      <TouchableOpacity
+        style={[styles.primaryButton, formLoading && styles.disabledButton]}
+        onPress={handleEmailLogin}
+        disabled={formLoading}
+      >
+        {formLoading ? (
+          <AnimatedLoader visible={true} size="small" color={colors.white} />
         ) : (
-          <View style={styles.form}>
-            <Text style={styles.formTitle}>Create Your Account</Text>
+          <>
+            <Text style={styles.primaryButtonText}>Sign In</Text>
+            <MaterialIcons name="arrow-forward" size={18} color={colors.white} />
+          </>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
 
-            {/* Google Sign-Up Button */}
-            <TouchableOpacity
-              style={styles.googleButton}
-              onPress={handleGoogleSignIn}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color={colors.primary} />
-              ) : (
-                <>
-                  <MaterialIcons name="language" size={24} color={colors.primary} />
-                  <Text style={styles.googleButtonText}>Sign Up with Google</Text>
-                </>
-              )}
-            </TouchableOpacity>
+  const renderEmailSignup = () => (
+    <View style={styles.formSection}>
+      <Text style={styles.sectionTitle}>Create account</Text>
+      <Text style={styles.sectionSubtitle}>One profile unlocks every tool.</Text>
 
-            {/* Divider */}
-            <View style={styles.dividerContainer}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.divider} />
-            </View>
+      {renderGoogleButton('Sign up with Google')}
 
-            {/* Name Input */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Full Name</Text>
-              <View style={styles.inputContainer}>
-                <MaterialIcons name="person" size={20} color={colors.textMuted} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Your full name"
-                  placeholderTextColor={colors.textMuted}
-                  value={signupName}
-                  onChangeText={setSignupName}
-                  editable={!loading}
-                />
-              </View>
-            </View>
+      <View style={styles.dividerRow}>
+        <View style={styles.divider} />
+        <Text style={styles.dividerLabel}>or email</Text>
+        <View style={styles.divider} />
+      </View>
 
-            {/* Email Input */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Email Address</Text>
-              <View style={styles.inputContainer}>
-                <MaterialIcons name="email" size={20} color={colors.textMuted} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="your@email.com"
-                  placeholderTextColor={colors.textMuted}
-                  value={signupEmail}
-                  onChangeText={setSignupEmail}
-                  editable={!loading}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-            </View>
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Full Name</Text>
+        <View style={styles.inputShell}>
+          <MaterialIcons name="person" size={18} color={colors.textMuted} />
+          <TextInput
+            style={styles.input}
+            placeholder="Alex Learner"
+            placeholderTextColor={colors.textLight}
+            value={signupName}
+            onChangeText={setSignupName}
+            editable={!formLoading}
+          />
+        </View>
+      </View>
 
-            {/* Password Input */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.inputContainer}>
-                <MaterialIcons name="lock" size={20} color={colors.textMuted} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="At least 6 characters"
-                  placeholderTextColor={colors.textMuted}
-                  value={signupPassword}
-                  onChangeText={setSignupPassword}
-                  editable={!loading}
-                  secureTextEntry={!signupPasswordVisible}
-                />
-                <TouchableOpacity
-                  onPress={() => setSignupPasswordVisible(!signupPasswordVisible)}
-                  disabled={loading}
-                >
-                  <MaterialIcons
-                    name={signupPasswordVisible ? 'visibility' : 'visibility-off'}
-                    size={20}
-                    color={colors.textMuted}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Email</Text>
+        <View style={styles.inputShell}>
+          <MaterialIcons name="alternate-email" size={18} color={colors.textMuted} />
+          <TextInput
+            style={styles.input}
+            placeholder="you@example.com"
+            placeholderTextColor={colors.textLight}
+            value={signupEmail}
+            onChangeText={setSignupEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            editable={!formLoading}
+          />
+        </View>
+      </View>
 
-            {/* Confirm Password Input */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Confirm Password</Text>
-              <View style={styles.inputContainer}>
-                <MaterialIcons name="lock" size={20} color={colors.textMuted} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Confirm your password"
-                  placeholderTextColor={colors.textMuted}
-                  value={signupConfirmPassword}
-                  onChangeText={setSignupConfirmPassword}
-                  editable={!loading}
-                  secureTextEntry={!signupConfirmPasswordVisible}
-                />
-                <TouchableOpacity
-                  onPress={() => setSignupConfirmPasswordVisible(!signupConfirmPasswordVisible)}
-                  disabled={loading}
-                >
-                  <MaterialIcons
-                    name={signupConfirmPasswordVisible ? 'visibility' : 'visibility-off'}
-                    size={20}
-                    color={colors.textMuted}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Terms & Conditions */}
-            <View style={styles.termsContainer}>
-              <Text style={styles.termsText}>
-                By creating an account, you agree to our{' '}
-                <Text style={styles.termsLink}>Terms of Service</Text>
-                {' '}and{' '}
-                <Text style={styles.termsLink}>Privacy Policy</Text>
-              </Text>
-            </View>
-
-            {/* Sign Up Button */}
-            <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleEmailSignup}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <>
-                  <Text style={styles.submitButtonText}>Create Account</Text>
-                  <MaterialIcons name="arrow-forward" size={20} color={colors.white} />
-                </>
-              )}
+      <View style={styles.fieldRow}>
+        <View style={[styles.fieldGroup, styles.halfWidth]}>
+          <Text style={styles.label}>Password</Text>
+          <View style={styles.inputShell}>
+            <MaterialIcons name="lock" size={18} color={colors.textMuted} />
+            <TextInput
+              style={styles.input}
+              placeholder="6+ characters"
+              placeholderTextColor={colors.textLight}
+              value={signupPassword}
+              onChangeText={setSignupPassword}
+              secureTextEntry={!signupPasswordVisible}
+              editable={!formLoading}
+            />
+            <TouchableOpacity onPress={() => setSignupPasswordVisible((prev) => !prev)} disabled={formLoading}>
+              <MaterialIcons
+                name={signupPasswordVisible ? 'visibility' : 'visibility-off'}
+                size={18}
+                color={colors.textMuted}
+              />
             </TouchableOpacity>
           </View>
-        )}
+        </View>
+
+        <View style={[styles.fieldGroup, styles.halfWidth]}>
+          <Text style={styles.label}>Confirm</Text>
+          <View style={styles.inputShell}>
+            <MaterialIcons name="verified-user" size={18} color={colors.textMuted} />
+            <TextInput
+              style={styles.input}
+              placeholder="Repeat password"
+              placeholderTextColor={colors.textLight}
+              value={signupConfirmPassword}
+              onChangeText={setSignupConfirmPassword}
+              secureTextEntry={!signupConfirmPasswordVisible}
+              editable={!formLoading}
+            />
+            <TouchableOpacity
+              onPress={() => setSignupConfirmPasswordVisible((prev) => !prev)}
+              disabled={formLoading}
+            >
+              <MaterialIcons
+                name={signupConfirmPasswordVisible ? 'visibility' : 'visibility-off'}
+                size={18}
+                color={colors.textMuted}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Secure • Private • Always Free to Start</Text>
+      <TouchableOpacity
+        style={[styles.primaryButton, formLoading && styles.disabledButton]}
+        onPress={handleEmailSignup}
+        disabled={formLoading}
+      >
+        {formLoading ? (
+          <AnimatedLoader visible={true} size="small" color={colors.white} />
+        ) : (
+          <>
+            <Text style={styles.primaryButtonText}>Create Account</Text>
+            <MaterialIcons name="north-east" size={18} color={colors.white} />
+          </>
+        )}
+      </TouchableOpacity>
+
+      <View style={styles.signupLinksRow}>
+        <Text style={styles.loginPromptText}>Already have an account?</Text>
+        <TouchableOpacity onPress={() => setActiveTab('login')}>
+          <Text style={styles.loginLink}> Log in</Text>
+        </TouchableOpacity>
       </View>
-    </ScrollView>
+
+      <View style={styles.policyLinksRow}>
+        <TouchableOpacity onPress={() => Linking.openURL('https://example.com/privacy')}>
+          <Text style={styles.smallLink}>Privacy Policy</Text>
+        </TouchableOpacity>
+        <Text style={styles.smallLinkSeparator}>•</Text>
+        <TouchableOpacity onPress={() => Linking.openURL('https://example.com/terms')}>
+          <Text style={styles.smallLink}>Terms</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderGuestLogin = () => (
+    <View style={styles.formSection}>
+      <Text style={styles.sectionTitle}>Continue as Guest</Text>
+      <Text style={styles.sectionSubtitle}>Explore without creating an account.</Text>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Full Name</Text>
+        <View style={styles.inputShell}>
+          <MaterialIcons name="person" size={18} color={colors.textMuted} />
+          <TextInput
+            style={styles.input}
+            placeholder="Your Name"
+            placeholderTextColor={colors.textLight}
+            value={guestName}
+            onChangeText={setGuestName}
+            editable={!formLoading}
+          />
+        </View>
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Email</Text>
+        <View style={styles.inputShell}>
+          <MaterialIcons name="alternate-email" size={18} color={colors.textMuted} />
+          <TextInput
+            style={styles.input}
+            placeholder="your@email.com"
+            placeholderTextColor={colors.textLight}
+            value={guestEmail}
+            onChangeText={setGuestEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            editable={!formLoading}
+          />
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={[styles.primaryButton, formLoading && styles.disabledButton]}
+        onPress={handleGuestLogin}
+        disabled={formLoading}
+      >
+        {formLoading ? (
+          <AnimatedLoader visible={true} size="small" color={colors.white} />
+        ) : (
+          <>
+            <Text style={styles.primaryButtonText}>Continue as Guest</Text>
+            <MaterialIcons name="arrow-forward" size={18} color={colors.white} />
+          </>
+        )}
+      </TouchableOpacity>
+
+      <View style={styles.loginPrompt}>
+        <Text style={styles.loginPromptText}>Want to create an account?</Text>
+        <TouchableOpacity onPress={() => setActiveTab('signup')}>
+          <Text style={styles.loginLink}> Sign up</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.screen}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer} 
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.container}>
+          {/* Left Side - Illustration */}
+          <View style={styles.leftSide}>
+            <View style={styles.logoHeader}>
+              <MaterialIcons name="school" size={20} color="#5B7EED" />
+            </View>
+
+            <View style={styles.centerContent}>
+              <View style={styles.heroTextContainer}>
+                <Text style={styles.heroTitle}>Unlock Your Potential</Text>
+                <Text style={styles.heroSubtitle}>
+                  Join a community of learners and educators. Access thousands of courses, quizzes, and resources to accelerate your growth.
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Right Side - Auth Form */}
+          <View style={styles.rightSide}>
+            <View style={styles.formCard}>
+              {/* Tab Navigation */}
+              <View style={styles.tabNavigation}>
+                <TouchableOpacity 
+                  style={[styles.tabButton, activeTab === 'login' && styles.tabButtonActive]}
+                  onPress={() => setActiveTab('login')}
+                >
+                  <Text style={[styles.tabButtonText, activeTab === 'login' && styles.tabButtonTextActive]}>Login</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.tabButton, activeTab === 'signup' && styles.tabButtonActive]}
+                  onPress={() => setActiveTab('signup')}
+                >
+                  <Text style={[styles.tabButtonText, activeTab === 'signup' && styles.tabButtonTextActive]}>Sign Up</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.tabButton, activeTab === 'guest' && styles.tabButtonActive]}
+                  onPress={() => setActiveTab('guest')}
+                >
+                  <Text style={[styles.tabButtonText, activeTab === 'guest' && styles.tabButtonTextActive]}>Guest</Text>
+                </TouchableOpacity>
+              </View>
+
+              {activeTab === 'login' ? renderEmailLogin() : activeTab === 'signup' ? renderEmailSignup() : renderGuestLogin()}
+
+              {redirectUri ? (
+                <View style={styles.redirectRow}>
+                  <Text style={styles.redirectLabel}>Redirect URI:</Text>
+                  <TouchableOpacity onPress={copyRedirectUri}>
+                    <Text style={styles.redirectText} numberOfLines={1} ellipsizeMode="middle">
+                      {redirectUri}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={copyRedirectUri} style={{ marginLeft: spacing.md }}>
+                    <Text style={styles.copyLink}>{copied ? 'Copied' : 'Copy'}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              <TouchableOpacity onPress={() => setShowHelp((s) => !s)} style={styles.helpToggle}>
+                <Text style={styles.helpToggleText}>{showHelp ? 'Hide' : 'Need help configuring Google?'}</Text>
+              </TouchableOpacity>
+              {showHelp && (
+                <View style={styles.helpCard}>
+                  <Text style={styles.helpTitle}>Recommended Google Cloud Console entries</Text>
+                  <Text style={styles.helpSubtitle}>Authorized JavaScript Origins</Text>
+                  <Text style={styles.helpItem}>http://localhost:19006</Text>
+                  <Text style={styles.helpItem}>http://localhost:8081</Text>
+                  <Text style={styles.helpItem}>http://127.0.0.1:19006</Text>
+                  <Text style={styles.helpSubtitle}>Authorized Redirect URIs</Text>
+                  <Text style={styles.helpItem}>https://auth.expo.io/@YOUR_EXPO_ACCOUNT/EdTechMobile</Text>
+                  <Text style={styles.helpItem}>edtechsolver://auth/callback</Text>
+                  <Text style={styles.helpNote}>Replace YOUR_EXPO_ACCOUNT with your Expo username (run expo whoami to check)</Text>
+                </View>
+              )}
+
+              <View style={styles.loginPrompt}>
+                <Text style={styles.loginPromptText}>
+                  Don't have an account? 
+                </Text>
+                <TouchableOpacity onPress={() => setActiveTab(activeTab === 'login' ? 'signup' : 'login')}>
+                  <Text style={styles.loginLink}> Sign up</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#F0F4FF',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    flexDirection: Platform.OS === 'web' ? 'row' : 'column',
   },
-  heroSection: {
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
+
+  // Left Side - Simple text area
+  leftSide: {
+    flex: 1,
+    backgroundColor: '#F0F4FF',
+    padding: spacing.xxxl,
+    justifyContent: 'space-between',
   },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: borderRadius.xl,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
+  logoHeader: {
+    marginBottom: spacing.xl,
+  },
+  centerContent: {
+    flex: 1,
     justifyContent: 'center',
-    marginBottom: spacing.md,
-    ...shadows.small,
   },
-  appTitle: {
-    ...typography.h1,
-    color: colors.primary,
-    marginBottom: spacing.xs,
-    textAlign: 'center',
+  heroTextContainer: {
+    maxWidth: 420,
   },
-  appSubtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    maxWidth: 280,
+  heroTitle: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#1A202C',
+    marginBottom: spacing.lg,
   },
-  featuresPreview: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+  heroSubtitle: {
+    fontSize: 15,
+    color: '#4A5568',
+    lineHeight: 24,
   },
-  featurePreviewItem: {
-    alignItems: 'center',
+
+  // Right Side - Form
+  rightSide: {
     flex: 1,
-  },
-  featurePreviewText: {
-    ...typography.small,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-    textAlign: 'center',
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.xs,
-    ...shadows.small,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: spacing.sm,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: borderRadius.md,
+    padding: spacing.xxxl,
   },
-  tabActive: {
-    backgroundColor: colors.primary,
-  },
-  tabText: {
-    ...typography.button,
-    color: colors.textSecondary,
-  },
-  tabTextActive: {
-    color: colors.white,
-  },
-  formContainer: {
-    paddingHorizontal: spacing.lg,
-  },
-  form: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    ...shadows.medium,
+  formCard: {
+    width: '100%',
+    maxWidth: 420,
   },
   formTitle: {
-    ...typography.h2,
-    color: colors.textPrimary,
-    marginBottom: spacing.lg,
-    textAlign: 'center',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1A202C',
+    marginBottom: spacing.sm,
+  },
+  formSubtitle: {
+    fontSize: 14,
+    color: '#718096',
+    marginBottom: spacing.xxxl,
+    lineHeight: 22,
+  },
+  redirectRow: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  redirectLabel: {
+    color: '#718096',
+    marginRight: spacing.sm,
+    fontSize: 12,
+  },
+  redirectText: {
+    color: '#64748B',
+    fontSize: 12,
+    maxWidth: 320,
+  },
+  copyLink: {
+    color: '#5B7EED',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  helpToggle: {
+    marginTop: spacing.sm,
+  },
+  helpToggleText: {
+    color: '#718096',
+    fontSize: 12,
+  },
+  helpCard: {
+    marginTop: spacing.sm,
+    backgroundColor: '#F8FAFF',
+    padding: spacing.sm,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E6EEF9',
+  },
+  helpTitle: {
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: spacing.xs,
+  },
+  helpSubtitle: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: spacing.xs,
+  },
+  helpItem: {
+    color: '#475569',
+    fontSize: 12,
+    marginTop: spacing.xs,
+  },
+  helpNote: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: spacing.xs,
   },
   googleButton: {
     flexDirection: 'row',
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    ...shadows.small,
+    backgroundColor: '#FFFFFF',
+  },
+  googleButtonBlock: {
+    gap: spacing.sm,
+  },
+  googleButtonDisabled: {
+    opacity: 0.5,
   },
   googleButtonText: {
-    ...typography.button,
-    color: colors.textPrimary,
-    marginLeft: spacing.sm,
+    fontWeight: '600',
+    color: '#1A202C',
+    fontSize: 15,
   },
-  dividerContainer: {
+  loginPrompt: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.xl,
+  },
+  loginPromptText: {
+    fontSize: 14,
+    color: '#718096',
+  },
+  loginLink: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#5B7EED',
+  },
+
+  // Unused but kept for compatibility
+  dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: spacing.md,
+    gap: spacing.md,
   },
   divider: {
     flex: 1,
     height: 1,
     backgroundColor: colors.border,
   },
-  dividerText: {
-    ...typography.small,
-    color: colors.textMuted,
-    paddingHorizontal: spacing.sm,
+  dividerLabel: {
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: colors.textLight,
   },
-  formGroup: {
-    marginBottom: spacing.md,
+  formSection: {
+    gap: spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  sectionSubtitle: {
+    color: colors.textSecondary,
+  },
+  fieldGroup: {
+    gap: spacing.sm,
   },
   label: {
-    ...typography.label,
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
   },
-  inputContainer: {
+  inputShell: {
     flexDirection: 'row',
+    gap: spacing.sm,
     alignItems: 'center',
-    backgroundColor: colors.inputBackground,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
+    backgroundColor: colors.backgroundGray,
   },
   input: {
     flex: 1,
-    ...typography.body,
-    color: colors.textPrimary,
-    marginLeft: spacing.sm,
+    fontSize: 15,
+    color: colors.text,
+    paddingVertical: spacing.sm,
   },
-  forgotPassword: {
+  linkButton: {
     alignSelf: 'flex-end',
-    marginBottom: spacing.md,
   },
-  forgotPasswordText: {
-    ...typography.small,
+  linkButtonText: {
     color: colors.primary,
+    fontWeight: '600',
   },
-  termsContainer: {
-    marginBottom: spacing.md,
-  },
-  termsText: {
-    ...typography.small,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  termsLink: {
-    color: colors.primary,
-  },
-  submitButton: {
+  primaryButton: {
     flexDirection: 'row',
+    gap: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    ...shadows.small,
-  },
-  submitButtonText: {
-    ...typography.button,
-    color: colors.white,
-    marginRight: spacing.sm,
-  },
-  footer: {
-    alignItems: 'center',
+    borderRadius: borderRadius.lg,
     paddingVertical: spacing.lg,
+    ...shadows.md,
   },
-  footerText: {
-    ...typography.small,
-    color: colors.textMuted,
+  primaryButtonText: {
+    color: colors.white,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  fieldRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    flexWrap: 'wrap',
+  },
+  halfWidth: {
+    flex: 1,
+    minWidth: 150,
+  },
+  policyText: {
+    textAlign: 'center',
+    color: colors.textLight,
+    fontSize: 12,
+    marginTop: spacing.xl,
+  },
+  signupLinksRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  policyLinksRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  smallLink: {
+    color: '#5B7EED',
+    fontSize: 12,
+    marginHorizontal: spacing.xs,
+  },
+  smallLinkSeparator: {
+    color: '#94A3B8',
+    fontSize: 12,
+    marginHorizontal: spacing.xs,
+  },
+  tabNavigation: {
+    flexDirection: 'row',
+    marginBottom: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  tabButtonActive: {
+    borderBottomColor: '#5B7EED',
+  },
+  tabButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  tabButtonTextActive: {
+    color: '#5B7EED',
   },
 });
+
+

@@ -6,11 +6,11 @@ import {
   TouchableOpacity, 
   StatusBar, 
   SafeAreaView, 
-  ActivityIndicator, 
   Alert,
   ScrollView,
   Platform,
-  Dimensions
+  Dimensions,
+  Image
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { TextInputComponent } from './src/components/TextInput';
@@ -20,19 +20,26 @@ import { Results } from './src/components/Results';
 import { Questions } from './src/components/Questions';
 import { Solutions } from './src/components/Solutions';
 import { Quiz } from './src/components/Quiz';
+import { QuizSelector } from './src/components/QuizSelector';
 import { Flashcard } from './src/components/Flashcard';
 import { StudyMaterial } from './src/components/StudyMaterial';
 import { PredictedQuestions } from './src/components/PredictedQuestions';
-import { YouTubeSummarizer } from './src/components/YouTubeSummarizer';
+import YouTubeSummarizer from './src/components/YouTubeSummarizerNew';
+import AnimatedLoader from './src/components/AnimatedLoader';
 import { Pricing } from './src/components/Pricing';
 import { AuthScreen } from './src/components/AuthScreen';
+import { AuthScreenNew } from './src/components/AuthScreenNew';
 import { LandingPageDashboard } from './src/components/LandingPageDashboard';
+import { LandingPage } from './src/components/LandingPage';
 import { MainDashboard } from './src/components/MainDashboard';
+import { TrendAnalysis } from './src/components/TrendAnalysis';
+import { getUserCoins } from './src/services/api';
+import { DailyQuizScreen } from './src/components/DailyQuizScreen';
 import { solveQuestionByText, solveQuestionByImage, checkHealth, generateQuiz, generateFlashcards, generateStudyMaterial, summarizeYouTubeVideo, generatePredictedQuestions } from './src/services/api';
 import { colors, spacing, borderRadius, typography, shadows } from './src/styles/theme';
 
 type TabType = 'text' | 'image';
-type PageType = 'dashboard' | 'quiz' | 'flashcards' | 'ask' | 'predicted-questions' | 'youtube-summarizer' | 'pricing' | 'profile';
+type PageType = 'dashboard' | 'mock-test' | 'quiz' | 'flashcards' | 'ask' | 'predicted-questions' | 'youtube-summarizer' | 'pricing' | 'profile' | 'trends' | 'daily-quiz';
 type DashboardSection = 'overview' | 'quiz' | 'flashcards' | 'study-material';
 type AppScreenType = 'auth' | 'landing' | 'main';
 
@@ -50,21 +57,17 @@ const isWeb = Platform.OS === 'web';
 // We'll use reactive screen width so web-resizes respond correctly
 // and compute layout breakpoints from that value.
 
-const navItems = [
-  { id: 'dashboard' as PageType, label: 'Dashboard', icon: 'dashboard' },
-  { id: 'quiz' as PageType, label: 'Quiz', icon: 'quiz' },
+  const navItems = [
+  { id: 'mock-test' as PageType, label: 'Mock Test', icon: 'quiz' },
+  { id: 'quiz' as PageType, label: 'Quiz', icon: 'school' },
   { id: 'flashcards' as PageType, label: 'Flashcards', icon: 'style' },
   { id: 'ask' as PageType, label: 'Ask Question', icon: 'help' },
-  { id: 'predicted-questions' as PageType, label: 'Predicted Questions', icon: 'auto-awesome' },
+  { id: 'predicted-questions' as PageType, label: 'Predicted Questions', icon: 'psychology' },
+  { id: 'trends' as PageType, label: 'Trends', icon: 'analytics' },
+  { id: 'daily-quiz' as PageType, label: 'Daily Quiz', icon: 'emoji-events' },
   { id: 'youtube-summarizer' as PageType, label: 'YouTube Summarizer', icon: 'ondemand-video' },
   { id: 'pricing' as PageType, label: 'Pricing', icon: 'local-offer' },
   { id: 'profile' as PageType, label: 'Profile', icon: 'account-circle' },
-];
-
-const heroStats = [
-  { id: 'speed', label: 'Avg Response', value: '2.3s', icon: 'bolt', hint: 'Real-time AI' },
-  { id: 'accuracy', label: 'Confidence', value: '98%', icon: 'verified', hint: 'Verified answers' },
-  { id: 'languages', label: 'Languages', value: '30+', icon: 'translate', hint: 'Auto-detect' },
 ];
 
 export default function App() {
@@ -82,6 +85,7 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [dashboardSection, setDashboardSection] = useState<DashboardSection>('overview');
   const [quizData, setQuizData] = useState<any>(null);
+  const [userCoins, setUserCoins] = useState<number>(0);
   const [flashcardData, setFlashcardData] = useState<any>(null);
   const [studyMaterialData, setStudyMaterialData] = useState<any>(null);
   const [predictedQuestionsData, setPredictedQuestionsData] = useState<any>(null);
@@ -91,13 +95,24 @@ export default function App() {
   const [studyMaterialLoading, setStudyMaterialLoading] = useState(false);
   const [predictedQuestionsLoading, setPredictedQuestionsLoading] = useState(false);
   const [youtubeSummaryLoading, setYoutubeSummaryLoading] = useState(false);
+  const [dailyQuizCount, setDailyQuizCount] = useState(0);
 
   // Authentication Handlers
   const handleAuthSuccess = (userInfo: User) => {
     setUser(userInfo);
     setAppScreen('main');
     setShowLanding(false);
-    setCurrentPage('dashboard');
+    setCurrentPage('ask');
+  };
+
+  const handleGuestLogin = () => {
+    const guestUser: User = {
+      id: 'guest_' + Date.now(),
+      name: 'Guest User',
+      email: 'guest@example.com',
+      provider: 'email',
+    };
+    handleAuthSuccess(guestUser);
   };
 
   const handleLogout = () => {
@@ -115,11 +130,27 @@ export default function App() {
   useEffect(() => {
     checkApiHealth();
     const interval = setInterval(checkApiHealth, 15000);
+    loadUserCoins();
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    // listen for dimension changes (useful for web resizing)
+    // Refresh coins when user changes (login/logout)
+    if (user?.id) loadUserCoins();
+  }, [user]);
+
+  const loadUserCoins = async () => {
+    try {
+      if (user?.id) {
+        const data = await getUserCoins(user.id);
+        setUserCoins(data.total_coins || 0);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
     const sub = Dimensions.addEventListener?.('change', ({ window }) => {
       setScreenWidth(window.width);
     });
@@ -186,7 +217,15 @@ export default function App() {
       setQuizData(response);
       setQuizLoading(false);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to generate quiz');
+      const status = error.response?.status;
+      const details = error.response?.data?.details || error.response?.data?.error;
+      if (status === 429) {
+        const retrySeconds = error.response?.headers?.['retry-after'];
+        const msg = `AI quota exceeded. Please retry${retrySeconds ? ' after ' + retrySeconds + 's' : ''}.`;
+        Alert.alert('Quota Exceeded', msg, details ? [{ text: 'Details', onPress: () => Alert.alert('Details', String(details)) }, { text: 'OK' }] : [{ text: 'OK' }]);
+      } else {
+        Alert.alert('Error', error.message || 'Failed to generate quiz');
+      }
       setQuizLoading(false);
     }
   };
@@ -225,7 +264,43 @@ export default function App() {
       setFlashcardData(response);
       setFlashcardLoading(false);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to generate flashcards');
+      const status = error.response?.status;
+      const details = error.response?.data?.details || error.response?.data?.error;
+      if (status === 429) {
+        const retrySeconds = error.response?.headers?.['retry-after'];
+        const msg = `AI quota exceeded. Please retry${retrySeconds ? ' after ' + retrySeconds + 's' : ''}.`;
+        Alert.alert('Quota Exceeded', msg, details ? [{ text: 'Details', onPress: () => Alert.alert('Details', String(details)) }, { text: 'OK' }] : [{ text: 'OK' }]);
+      } else {
+        Alert.alert('Error', error.message || 'Failed to generate flashcards');
+      }
+      setFlashcardLoading(false);
+    }
+  };
+
+  const handleGenerateFlashcardsFromImage = async (imageUri: string) => {
+    setFlashcardLoading(true);
+    setFlashcardData(null);
+
+    try {
+      const document = {
+        uri: imageUri,
+        mimeType: 'image/jpeg',
+        name: 'image_upload.jpg',
+      } as any;
+
+      const response = await generateFlashcards('', 10, document);
+      setFlashcardData(response);
+      setFlashcardLoading(false);
+    } catch (error: any) {
+      const status = error.response?.status;
+      const details = error.response?.data?.details || error.response?.data?.error;
+      if (status === 429) {
+        const retrySeconds = error.response?.headers?.['retry-after'];
+        const msg = `AI quota exceeded. Please retry${retrySeconds ? ' after ' + retrySeconds + 's' : ''}.`;
+        Alert.alert('Quota Exceeded', msg, details ? [{ text: 'Details', onPress: () => Alert.alert('Details', String(details)) }, { text: 'OK' }] : [{ text: 'OK' }]);
+      } else {
+        Alert.alert('Error', error.message || 'Failed to generate flashcards from image');
+      }
       setFlashcardLoading(false);
     }
   };
@@ -245,7 +320,15 @@ export default function App() {
       setFlashcardData(response);
       setFlashcardLoading(false);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to generate flashcards from file');
+      const status = error.response?.status;
+      const details = error.response?.data?.details || error.response?.data?.error;
+      if (status === 429) {
+        const retrySeconds = error.response?.headers?.['retry-after'];
+        const msg = `AI quota exceeded. Please retry${retrySeconds ? ' after ' + retrySeconds + 's' : ''}.`;
+        Alert.alert('Quota Exceeded', msg, details ? [{ text: 'Details', onPress: () => Alert.alert('Details', String(details)) }, { text: 'OK' }] : [{ text: 'OK' }]);
+      } else {
+        Alert.alert('Error', error.message || 'Failed to generate flashcards from file');
+      }
       setFlashcardLoading(false);
     }
   };
@@ -264,7 +347,15 @@ export default function App() {
       setStudyMaterialData(response);
       setStudyMaterialLoading(false);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to generate study material');
+      const status = error.response?.status;
+      const details = error.response?.data?.details || error.response?.data?.error;
+      if (status === 429) {
+        const retrySeconds = error.response?.headers?.['retry-after'];
+        const msg = `AI quota exceeded. Please retry${retrySeconds ? ' after ' + retrySeconds + 's' : ''}.`;
+        Alert.alert('Quota Exceeded', msg, details ? [{ text: 'Details', onPress: () => Alert.alert('Details', String(details)) }, { text: 'OK' }] : [{ text: 'OK' }]);
+      } else {
+        Alert.alert('Error', error.message || 'Failed to generate study material');
+      }
       setStudyMaterialLoading(false);
     }
   };
@@ -279,7 +370,6 @@ export default function App() {
     setStudyMaterialData(null);
 
     try {
-      // Use first file for now (backend supports single file)
       const response = await generateStudyMaterial(undefined, files[0]);
       setStudyMaterialData(response);
       setStudyMaterialLoading(false);
@@ -303,7 +393,31 @@ export default function App() {
       setPredictedQuestionsData(response);
       setPredictedQuestionsLoading(false);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to generate predicted questions');
+      // Show backend details if available
+      const message = error.response?.data?.error || error.message || 'Failed to generate predicted questions';
+      const details = error.response?.data?.details;
+      Alert.alert('Error', message, details ? [{ text: 'Details', onPress: () => Alert.alert('Details', String(details)) }, { text: 'OK' }] : [{ text: 'OK' }]);
+      setPredictedQuestionsLoading(false);
+    }
+  };
+
+  const handleGeneratePredictedQuestionsFromImage = async (imageUri: string) => {
+    // Send image as document to the backend which will use OCR to extract text
+    setPredictedQuestionsLoading(true);
+    setPredictedQuestionsData(null);
+
+    try {
+      const document = {
+        uri: imageUri,
+        mimeType: 'image/jpeg',
+        name: 'image_upload.jpg',
+      } as any;
+
+      const response = await generatePredictedQuestions(undefined, 'General', 5, document);
+      setPredictedQuestionsData(response);
+      setPredictedQuestionsLoading(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to generate predicted questions from image');
       setPredictedQuestionsLoading(false);
     }
   };
@@ -341,9 +455,29 @@ export default function App() {
       setYoutubeSummaryData(response);
       setYoutubeSummaryLoading(false);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to summarize YouTube video');
+      const message = error.response?.data?.error || error.message || 'Failed to summarize YouTube video';
+      const details = error.response?.data?.details;
+      Alert.alert('Error', message, details ? [{ text: 'Details', onPress: () => Alert.alert('Details', String(details)) }, { text: 'OK' }] : [{ text: 'OK' }]);
       setYoutubeSummaryLoading(false);
     }
+  };
+
+  const handleStartQuiz = (config: any) => {
+    // Build a descriptive topic string from subject + selected topics to satisfy backend minimum length
+    const topicsText = (config.topics && config.topics.length > 0) ? config.topics.join(', ') : '';
+    let topic = `${config.subject}${topicsText ? ': ' + topicsText : ''}`;
+
+    // If still short, add a short prompt to reach minimum length required by backend
+    if (topic.trim().length < 50) {
+      topic = `${topic} - Generate ${config.numQuestions} ${config.difficulty} level questions covering ${topicsText || config.subject} with sample answers and explanations.`;
+    }
+
+    const numQuestions = config.numQuestions;
+    const difficulty = config.difficulty;
+
+    handleGenerateQuiz(topic, numQuestions, difficulty);
+    // Increment Daily Quiz count for free users
+    setDailyQuizCount(prev => prev + 1);
   };
 
   const renderSidebar = () => {
@@ -364,22 +498,16 @@ export default function App() {
           )}
         </View>
 
-        {screenWidth > 767 && (
-          <View style={styles.topRight}>
-            <View style={styles.searchShell}>
-              <MaterialIcons name="search" size={18} color={colors.textMuted} />
-              <Text style={{ marginLeft: 8, color: colors.textMuted }}>Search</Text>
-            </View>
-
-            <TouchableOpacity style={styles.iconButton}>
-              <MaterialIcons name="notifications" size={22} color={colors.textMuted} />
-            </TouchableOpacity>
-
-            <View style={styles.avatarSmall}>
-              <MaterialIcons name="account-circle" size={28} color={colors.primary} />
-            </View>
+        {/* Always show compact right-side: coins + avatar (removes search and notifications) */}
+        <View style={styles.topRightCompact}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+            <Image source={require('./assets/coins.png')} style={{ width: 20, height: 20 }} />
+            <Text style={{ marginLeft: 8, color: colors.text, fontWeight: '700' }}>{userCoins}</Text>
           </View>
-        )}
+          <View style={styles.avatarSmall}>
+            <MaterialIcons name="account-circle" size={28} color={colors.primary} />
+          </View>
+        </View>
       </View>
 
       <View style={styles.pageHeader}>
@@ -402,55 +530,6 @@ export default function App() {
           </Text>
         </View>
       </View>
-
-      {/* Hero stats: responsive layout depends on width */}
-      {screenWidth >= 1280 ? (
-        <View style={styles.heroGridRow}>
-          {heroStats.map((stat) => (
-            <View key={stat.id} style={styles.statCardLarge}>
-              <MaterialIcons name={stat.icon as any} size={30} color={colors.primary} />
-              <View style={styles.statContentCenter}>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-                <Text style={styles.statValueLarge}>{stat.value}</Text>
-                <Text style={styles.statHint}>{stat.hint}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : screenWidth >= 768 ? (
-        <View style={{ width: '100%' }}>
-          <View style={styles.heroGridRowTwo}>
-            {heroStats.slice(0, 2).map((stat) => (
-              <View key={stat.id} style={styles.statCardMedium}>
-                <MaterialIcons name={stat.icon as any} size={26} color={colors.primary} />
-                <View style={styles.statContentCenter}>
-                  <Text style={styles.statLabel}>{stat.label}</Text>
-                  <Text style={styles.statValueLarge}>{stat.value}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-          <View style={[styles.heroGridRowTwo, { marginTop: 12 }]}>
-            <View style={styles.statCardMediumFull}>
-              <MaterialIcons name={heroStats[2].icon as any} size={26} color={colors.primary} />
-              <View style={styles.statContentCenter}>
-                <Text style={styles.statLabel}>{heroStats[2].label}</Text>
-                <Text style={styles.statValueLarge}>{heroStats[2].value}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      ) : (
-        <View style={styles.heroGridRowMobile}>
-          {heroStats.map((stat) => (
-            <View key={stat.id} style={styles.statCardMobile}>
-              <MaterialIcons name={stat.icon as any} size={18} color={colors.primary} />
-              <Text style={styles.statValueMobile}>{stat.value}</Text>
-              <Text style={styles.statLabelMobile}>{stat.label}</Text>
-            </View>
-          ))}
-        </View>
-      )}
 
       {/* If the app page is Questions or Solutions, show that view instead of the ask input */}
       {currentPage === 'dashboard' ? (
@@ -481,7 +560,7 @@ export default function App() {
                 color={dashboardSection === 'quiz' ? colors.primary : colors.textMuted} 
               />
               <Text style={[styles.dashboardTabText, dashboardSection === 'quiz' && styles.dashboardTabTextActive]}>
-                Quiz
+                Mock Test
               </Text>
             </TouchableOpacity>
 
@@ -520,15 +599,15 @@ export default function App() {
               <View style={styles.overviewContainer}>
                 <View style={styles.featureCard}>
                   <MaterialIcons name="quiz" size={48} color={colors.primary} />
-                  <Text style={styles.featureTitle}>Generate Quiz</Text>
+                  <Text style={styles.featureTitle}>Generate Mock Test</Text>
                   <Text style={styles.featureDescription}>
-                    Create interactive quizzes from any topic or document
+                    Create targeted practice tests from any topic or document
                   </Text>
                   <TouchableOpacity 
                     style={styles.featureButton}
                     onPress={() => setDashboardSection('quiz')}
                   >
-                    <Text style={styles.featureButtonText}>Start Quiz</Text>
+                    <Text style={styles.featureButtonText}>Start Mock Test</Text>
                     <MaterialIcons name="arrow-forward" size={20} color={colors.white} />
                   </TouchableOpacity>
                 </View>
@@ -583,22 +662,13 @@ export default function App() {
             {dashboardSection === 'quiz' && (
               <View style={styles.sectionContainer}>
                 {!quizData && !quizLoading && (
-                  <View style={styles.inputSection}>
-                    <Text style={styles.sectionTitle}>Generate Quiz</Text>
-                    <TextInputComponent 
-                      onSubmit={(topic) => handleGenerateQuiz(topic, 5, 'medium')} 
-                      loading={quizLoading}
-                      placeholder="Enter a topic (e.g., Photosynthesis, World War 2, Python programming)"
-                    />
-
-                    <Text style={styles.orText}>— or —</Text>
-
-                    <FileUpload
-                      onSubmit={(file) => handleGenerateQuizFromFile(file, 5, 'medium')}
-                      loading={quizLoading}
-                      placeholder="Upload a PDF/TXT/Image to generate a quiz"
-                    />
-                  </View>
+                  <QuizSelector 
+                    onStartQuiz={handleStartQuiz} 
+                    onClose={() => {}} 
+                    userCoins={0}
+                    isPremium={false}
+                    dailyQuizCount={dailyQuizCount}
+                  />
                 )}
                 <Quiz quizData={quizData} loading={quizLoading} />
                 {quizData && (
@@ -633,7 +703,12 @@ export default function App() {
                     />
                   </View>
                 )}
-                <Flashcard flashcardData={flashcardData} loading={flashcardLoading} />
+                <Flashcard 
+                  flashcardData={flashcardData} 
+                  loading={flashcardLoading}
+                  onTextSubmit={(text) => handleGenerateFlashcards(text, 10)}
+                  onImageSubmit={handleGenerateFlashcardsFromImage}
+                />
                 {flashcardData && (
                   <TouchableOpacity 
                     style={styles.newContentButton}
@@ -683,29 +758,107 @@ export default function App() {
             )}
           </ScrollView>
         </View>
-      ) : currentPage === 'quiz' ? (
-        <View style={{ flex: 1, padding: spacing.lg }}>
+      ) : currentPage === 'mock-test' ? (
+        <View style={{ flex: 1 }}>
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             <View style={styles.sectionContainer}>
               {!quizData && !quizLoading && (
-                <View style={styles.inputSection}>
-                  <Text style={styles.sectionTitle}>Generate Quiz</Text>
-                  <TextInputComponent 
-                    onSubmit={(topic) => handleGenerateQuiz(topic, 5, 'medium')} 
-                    loading={quizLoading}
-                    placeholder="Enter a topic (e.g., Photosynthesis, World War 2, Python programming)"
+                <QuizSelector 
+                  onStartQuiz={handleStartQuiz} 
+                  onClose={() => setCurrentPage('ask')} 
+                  userCoins={0}
+                  isPremium={false}
+                  dailyQuizCount={dailyQuizCount}
+                />
+              )}
+              {(quizData || quizLoading) && (
+                <Quiz quizData={quizData} loading={quizLoading} />
+              )}
+              {quizData && (
+                <TouchableOpacity 
+                  style={styles.newContentButton}
+                  onPress={() => setQuizData(null)}
+                >
+                  <MaterialIcons name="add" size={20} color={colors.white} />
+                  <Text style={styles.newContentButtonText}>Generate New Quiz</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      ) : currentPage === 'quiz' ? (
+        <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <View style={styles.featurePageContainer}>
+              {!quizData && !quizLoading && (
+                <View style={styles.featureHeader}>
+                  <Image 
+                    source={require('./assets/Quiz.png')} 
+                    style={styles.featureHeaderImage} 
+                    resizeMode="contain" 
                   />
-
-                  <Text style={styles.orText}>— or —</Text>
-
-                  <FileUpload
-                    onSubmit={(file) => handleGenerateQuizFromFile(file, 5, 'medium')}
-                    loading={quizLoading}
-                    placeholder="Upload a PDF/TXT/Image to generate a quiz"
-                  />
+                  <Text style={styles.featureTitle}>Generate Quiz from Document or Text</Text>
+                  <Text style={styles.featureSubtitle}>
+                    Upload a document or paste text to generate custom quiz questions
+                  </Text>
                 </View>
               )}
-              <Quiz quizData={quizData} loading={quizLoading} />
+
+              {!quizData && !quizLoading && (
+                <View style={styles.horizontalTabsContainer}>
+                  <View style={styles.horizontalTabs}>
+                    <TouchableOpacity
+                      style={[styles.horizontalTab, activeTab === 'text' && styles.horizontalTabActive]}
+                      onPress={() => setActiveTab('text')}
+                    >
+                      <MaterialIcons 
+                        name="text-fields" 
+                        size={20} 
+                        color={activeTab === 'text' ? colors.white : colors.textMuted} 
+                      />
+                      <Text style={[styles.horizontalTabText, activeTab === 'text' && styles.horizontalTabTextActive]}>
+                        Text Input
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.horizontalTab, activeTab === 'image' && styles.horizontalTabActive]}
+                      onPress={() => setActiveTab('image')}
+                    >
+                      <MaterialIcons 
+                        name="upload-file" 
+                        size={20} 
+                        color={activeTab === 'image' ? colors.white : colors.textMuted} 
+                      />
+                      <Text style={[styles.horizontalTabText, activeTab === 'image' && styles.horizontalTabTextActive]}>
+                        Document Upload
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.horizontalTabContent}>
+                    {activeTab === 'text' ? (
+                      <TextInputComponent 
+                        onSubmit={(text) => handleGenerateQuiz(text, 10, 'medium')} 
+                        loading={quizLoading}
+                        placeholder="Paste your study material, notes, or topic content here..."
+                      />
+                    ) : (
+                      <FileUpload
+                        onSubmit={(file) => handleGenerateQuizFromFile(file, 10, 'medium')}
+                        loading={quizLoading}
+                        placeholder="Upload PDF, TXT, or Image document to generate quiz"
+                      />
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {(quizData || quizLoading) && (
+                <View style={styles.contentSection}>
+                  <Quiz quizData={quizData} loading={quizLoading} />
+                </View>
+              )}
+
               {quizData && (
                 <TouchableOpacity 
                   style={styles.newContentButton}
@@ -719,28 +872,46 @@ export default function App() {
           </ScrollView>
         </View>
       ) : currentPage === 'flashcards' ? (
-        <View style={{ flex: 1, padding: spacing.lg }}>
+        <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-            <View style={styles.sectionContainer}>
+            <View style={styles.featurePageContainer}>
+              {/* Header Section */}
+              {!flashcardData && !flashcardLoading && (
+                <View style={styles.featureHeader}>
+                  <Image 
+                    source={require('./assets/Books.png')} 
+                    style={styles.featureHeaderImage} 
+                    resizeMode="contain" 
+                  />
+                  <Text style={styles.featureTitle}>Generate Flashcards</Text>
+                  <Text style={styles.featureSubtitle}>
+                    Create interactive study cards with questions and answers from any topic or document
+                  </Text>
+                </View>
+              )}
+
               {!flashcardData && !flashcardLoading && (
                 <View style={styles.inputSection}>
-                  <Text style={styles.sectionTitle}>Generate Flashcards</Text>
-                  <TextInputComponent 
-                    onSubmit={(topic) => handleGenerateFlashcards(topic, 10)} 
+                  <Flashcard
+                    flashcardData={null}
                     loading={flashcardLoading}
-                    placeholder="Enter a topic (e.g., Spanish vocabulary, Chemistry formulas, History dates)"
-                  />
-
-                  <Text style={styles.orText}>— or —</Text>
-
-                  <FileUpload
-                    onSubmit={(file) => handleGenerateFlashcardsFromFile(file, 10)}
-                    loading={flashcardLoading}
-                    placeholder="Upload a PDF/TXT/Image to generate flashcards"
+                    onTextSubmit={(topic) => handleGenerateFlashcards(topic, 10)}
+                    onImageSubmit={handleGenerateFlashcardsFromImage}
                   />
                 </View>
               )}
-              <Flashcard flashcardData={flashcardData} loading={flashcardLoading} />
+              
+              {(flashcardData || flashcardLoading) && (
+                <View style={styles.contentSection}>
+                  <Flashcard 
+                    flashcardData={flashcardData} 
+                    loading={flashcardLoading}
+                    onTextSubmit={(text) => handleGenerateFlashcards(text, 10)}
+                    onImageSubmit={handleGenerateFlashcardsFromImage}
+                  />
+                </View>
+              )}
+              
               {flashcardData && (
                 <TouchableOpacity 
                   style={styles.newContentButton}
@@ -754,31 +925,34 @@ export default function App() {
           </ScrollView>
         </View>
       ) : currentPage === 'predicted-questions' ? (
-        <View style={{ flex: 1, padding: spacing.lg }}>
+        <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-            <View style={styles.sectionContainer}>
+            <View style={styles.featurePageContainer}>
+
+
               {!predictedQuestionsData && !predictedQuestionsLoading && (
                 <View style={styles.inputSection}>
-                  <Text style={styles.sectionTitle}>Get Predicted Important Questions</Text>
-                  <Text style={styles.sectionSubtitle}>
-                    Enter a subject or topic to generate likely exam questions based on importance and difficulty
-                  </Text>
-                  <TextInputComponent 
-                    onSubmit={(topic) => handleGeneratePredictedQuestions(topic, 'General')} 
+                  <PredictedQuestions
+                    predictedQuestionsData={null}
                     loading={predictedQuestionsLoading}
-                    placeholder="Enter a subject or topic (e.g., Machine Learning, Organic Chemistry)"
-                  />
-
-                  <Text style={styles.orText}>— or —</Text>
-
-                  <FileUpload
-                    onSubmit={(file) => handleGeneratePredictedQuestionsFromFile(file, 'General')}
-                    loading={predictedQuestionsLoading}
-                    placeholder="Upload syllabus/notes to predict important questions"
+                    onTextSubmit={(topic) => handleGeneratePredictedQuestions(topic, 'General')}
+                    onFileSubmit={(files) => handleGeneratePredictedQuestionsFromFile(files, 'General')}
                   />
                 </View>
               )}
-              <PredictedQuestions predictedQuestionsData={predictedQuestionsData} loading={predictedQuestionsLoading} />
+              
+              {(predictedQuestionsData || predictedQuestionsLoading) && (
+                <View style={styles.contentSection}>
+                  <PredictedQuestions 
+                    predictedQuestionsData={predictedQuestionsData} 
+                    loading={predictedQuestionsLoading}
+                    onTextSubmit={(text) => handleGeneratePredictedQuestions(text, 'General')}
+                    onImageSubmit={handleGeneratePredictedQuestionsFromImage}
+                    onFileSubmit={(files) => handleGeneratePredictedQuestionsFromFile(files, 'General')}
+                  />
+                </View>
+              )}
+              
               {predictedQuestionsData && (
                 <TouchableOpacity 
                   style={styles.newContentButton}
@@ -813,72 +987,101 @@ export default function App() {
           </ScrollView>
         </View>
       ) : currentPage === 'ask' ? (
-        <View style={{ flex: 1 }}>
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'text' && styles.activeTab]}
-              onPress={() => setActiveTab('text')}
-            >
-              <MaterialIcons 
-                name="text-fields" 
-                size={20} 
-                color={activeTab === 'text' ? colors.primary : colors.textMuted} 
-              />
-              <Text style={[styles.tabText, activeTab === 'text' && styles.activeTabText]}>
-                Text Input
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'image' && styles.activeTab]}
-              onPress={() => setActiveTab('image')}
-            >
-              <MaterialIcons 
-                name="photo-camera" 
-                size={20} 
-                color={activeTab === 'image' ? colors.primary : colors.textMuted} 
-              />
-              <Text style={[styles.tabText, activeTab === 'image' && styles.activeTabText]}>
-                Image Upload
-              </Text>
-            </TouchableOpacity>
-          </View>
-
+        <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
           <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            {loading && (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={styles.loadingText}>Processing your question...</Text>
+            <View style={styles.askQuestionContainer}>
+              {/* Header Section */}
+              <View style={styles.askQuestionHeader}>
+                <MaterialIcons name="help-outline" size={48} color={colors.primary} />
+                <Text style={styles.askQuestionTitle}>Ask Any Question</Text>
+                <Text style={styles.askQuestionSubtitle}>
+                  Get instant AI-powered answers with step-by-step explanations
+                </Text>
               </View>
-            )}
 
-            {!loading && !results && (
-              <View style={styles.inputContainer}>
-                {activeTab === 'text' ? (
-                  <TextInputComponent onSubmit={handleTextSubmit} loading={loading} />
-                ) : (
-                  <ImageUpload onSubmit={handleImageSubmit} loading={loading} />
-                )}
-              </View>
-            )}
-
-            {!loading && results && (
-              <View style={styles.resultsContainer}>
-                <Results data={results} />
+              {/* Tab Selector */}
+              <View style={styles.tabContainer}>
                 <TouchableOpacity
-                  style={styles.newQuestionButton}
-                  onPress={() => setResults(null)}
+                  style={[styles.tab, activeTab === 'text' && styles.activeTab]}
+                  onPress={() => setActiveTab('text')}
                 >
-                  <MaterialIcons name="add" size={20} color={colors.white} />
-                  <Text style={styles.newQuestionText}>Ask New Question</Text>
+                  <MaterialIcons 
+                    name="text-fields" 
+                    size={20} 
+                    color={activeTab === 'text' ? colors.primary : colors.textMuted} 
+                  />
+                  <Text style={[styles.tabText, activeTab === 'text' && styles.activeTabText]}>
+                    Text Input
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.tab, activeTab === 'image' && styles.activeTab]}
+                  onPress={() => setActiveTab('image')}
+                >
+                  <MaterialIcons 
+                    name="photo-camera" 
+                    size={20} 
+                    color={activeTab === 'image' ? colors.primary : colors.textMuted} 
+                  />
+                  <Text style={[styles.tabText, activeTab === 'image' && styles.activeTabText]}>
+                    Image Upload
+                  </Text>
                 </TouchableOpacity>
               </View>
-            )}
+
+              {loading && (
+                <View style={styles.loadingContainer}>
+                  <AnimatedLoader visible={true} size="large" />
+                </View>
+              )}
+
+              {!loading && !results && (
+                <View style={styles.inputSection}>
+                  {activeTab === 'text' ? (
+                    <TextInputComponent onSubmit={handleTextSubmit} loading={loading} />
+                  ) : (
+                    <ImageUpload onSubmit={handleImageSubmit} loading={loading} />
+                  )}
+                </View>
+              )}
+
+              {!loading && results && (
+                <View style={styles.resultsSection}>
+                  <Results data={results} />
+                  <TouchableOpacity
+                    style={styles.newContentButton}
+                    onPress={() => setResults(null)}
+                  >
+                    <MaterialIcons name="add" size={20} color={colors.white} />
+                    <Text style={styles.newContentButtonText}>Ask New Question</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           </ScrollView>
         </View>
       ) : currentPage === 'pricing' ? (
         <View style={{ flex: 1 }}>
           <Pricing />
+        </View>
+      ) : currentPage === 'daily-quiz' ? (
+        <View style={{ flex: 1 }}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <View style={styles.featurePageContainer}>
+              <DailyQuizScreen
+                userId={user?.id || 'guest'}
+                onComplete={() => { setCurrentPage('ask'); setDailyQuizCount(prev => prev + 1); loadUserCoins(); }}
+                onClose={() => setCurrentPage('ask')}
+              />
+            </View>
+          </ScrollView>
+        </View>
+      ) : currentPage === 'trends' ? (
+        <View style={{ flex: 1, padding: spacing.lg }}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <TrendAnalysis onClose={() => setCurrentPage('ask')} />
+          </ScrollView>
         </View>
       ) : currentPage === 'profile' ? (
         <View style={{ flex: 1, padding: spacing.lg }}>
@@ -919,15 +1122,16 @@ export default function App() {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
         {showLanding ? (
-          <LandingPageDashboard 
-            onNavigateToFeature={() => setShowLanding(false)}
-            onNavigateToPricing={() => {
-              setShowLanding(false);
-              setUser({ id: 'temp', name: 'Guest', email: 'guest@example.com', provider: 'email' });
-            }}
+          <LandingPage 
+            onGetStarted={() => setShowLanding(false)}
+            onLogin={() => setShowLanding(false)}
+            onGuestLogin={handleGuestLogin}
           />
         ) : (
-          <AuthScreen onAuthSuccess={handleAuthSuccess} />
+          <AuthScreenNew 
+            onAuthSuccess={handleAuthSuccess}
+            onGuestLogin={handleGuestLogin}
+          />
         )}
       </SafeAreaView>
     );
@@ -1224,6 +1428,7 @@ const styles = StyleSheet.create({
   },
   topLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  topRightCompact: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   hamburger: { padding: spacing.xs },
   pageHeadingText: { ...typography.h3, marginLeft: spacing.sm },
   searchShell: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: borderRadius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
@@ -1245,8 +1450,11 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xs,
+    gap: spacing.xs,
+    marginBottom: spacing.lg,
+    ...shadows.sm,
   },
   tab: {
     flex: 1,
@@ -1254,20 +1462,93 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: 'transparent',
   },
   activeTab: {
-    borderBottomColor: colors.primary,
+    backgroundColor: colors.primary,
   },
   tabText: {
     ...typography.body,
     color: colors.textMuted,
+    fontWeight: '500',
   },
   activeTabText: {
-    color: colors.primary,
+    color: colors.white,
     fontWeight: '600',
+  },
+  askQuestionContainer: {
+    padding: spacing.xl,
+    maxWidth: 1200,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  askQuestionHeader: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+    paddingVertical: spacing.xl,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    ...shadows.sm,
+  },
+  askQuestionTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  askQuestionSubtitle: {
+    fontSize: 16,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  resultsSection: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    ...shadows.sm,
+  },
+  featurePageContainer: {
+    padding: spacing.xl,
+    maxWidth: 1200,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  featureHeader: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+    paddingVertical: spacing.xl,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    ...shadows.sm,
+  },
+  featureHeaderImage: {
+    width: 120,
+    height: 120,
+    marginBottom: spacing.md,
+  },
+  featureTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  featureSubtitle: {
+    fontSize: 16,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xl,
+    lineHeight: 24,
+  },
+  contentSection: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    ...shadows.sm,
   },
   scrollContent: {
     flex: 1,
@@ -1283,10 +1564,16 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   inputContainer: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
     padding: spacing.xl,
+    ...shadows.sm,
   },
   resultsContainer: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
     padding: spacing.xl,
+    ...shadows.sm,
   },
   newQuestionButton: {
     backgroundColor: colors.primary,
@@ -1342,11 +1629,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...shadows.md,
   },
-  featureTitle: {
-    ...typography.h2,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
   featureDescription: {
     ...typography.body,
     color: colors.textMuted,
@@ -1376,6 +1658,18 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     marginBottom: spacing.lg,
     ...shadows.sm,
+  },
+  // Horizontal inputs used on wide screens
+  horizontalInputsApp: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  leftColApp: {
+    flex: 1.2,
+  },
+  rightColApp: {
+    flex: 1,
   },
   sectionTitle: {
     ...typography.h2,
@@ -1449,5 +1743,46 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: spacing.xs,
     textAlign: 'center',
+  },
+  // Horizontal tab styles for Quiz page
+  horizontalTabsContainer: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.lg,
+    marginVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.sm,
+  },
+  horizontalTabs: {
+    flexDirection: 'row',
+    backgroundColor: colors.background,
+    padding: spacing.xs,
+    gap: spacing.xs,
+  },
+  horizontalTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    backgroundColor: 'transparent',
+  },
+  horizontalTabActive: {
+    backgroundColor: colors.primary,
+    ...shadows.sm,
+  },
+  horizontalTabText: {
+    ...typography.body,
+    color: colors.textMuted,
+    fontWeight: '600',
+  },
+  horizontalTabTextActive: {
+    color: colors.white,
+  },
+  horizontalTabContent: {
+    padding: spacing.lg,
   },
 });

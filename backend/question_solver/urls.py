@@ -29,6 +29,12 @@ from .auth_views import (
     UserProfileView,
     LogoutView
 )
+from .simple_auth_views import (
+    RegisterView,
+    LoginView,
+    VerifyTokenView,
+    ChangePasswordView
+)
 from .payment_views import (
     CreatePaymentOrderView,
     VerifyPaymentView,
@@ -36,6 +42,13 @@ from .payment_views import (
     PaymentHistoryView,
     RefundPaymentView,
     RazorpayKeyView
+)
+from .daily_quiz_views import (
+    get_daily_quiz,
+    start_daily_quiz,
+    submit_daily_quiz,
+    get_user_coins,
+    get_quiz_history
 )
 
 urlpatterns = [
@@ -58,11 +71,17 @@ urlpatterns = [
     path('subscription/log-usage/', LogFeatureUsageView.as_view(), name='log-usage'),
     path('subscription/billing-history/', BillingHistoryView.as_view(), name='billing-history'),
     
-    # Authentication endpoints
+    # Authentication endpoints (Google OAuth)
     path('auth/google/callback/', GoogleOAuthCallbackView.as_view(), name='google-oauth-callback'),
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('auth/user/profile/', UserProfileView.as_view(), name='user-profile'),
     path('auth/logout/', LogoutView.as_view(), name='logout'),
+    
+    # Authentication endpoints (Email/Password)
+    path('auth/register/', RegisterView.as_view(), name='register'),
+    path('auth/login/', LoginView.as_view(), name='login'),
+    path('auth/verify/', VerifyTokenView.as_view(), name='verify-token'),
+    path('auth/change-password/', ChangePasswordView.as_view(), name='change-password'),
     
     # Payment endpoints (Razorpay)
     path('payment/create-order/', CreatePaymentOrderView.as_view(), name='create-payment-order'),
@@ -71,5 +90,11 @@ urlpatterns = [
     path('payment/history/', PaymentHistoryView.as_view(), name='payment-history'),
     path('payment/refund/', RefundPaymentView.as_view(), name='refund-payment'),
     path('payment/razorpay-key/', RazorpayKeyView.as_view(), name='razorpay-key'),
+    
+    # Daily Quiz endpoints
+    path('daily-quiz/', get_daily_quiz, name='daily-quiz'),
+    path('daily-quiz/start/', start_daily_quiz, name='start-daily-quiz'),
+    path('daily-quiz/submit/', submit_daily_quiz, name='submit-daily-quiz'),
+    path('daily-quiz/coins/', get_user_coins, name='user-coins'),
+    path('daily-quiz/history/', get_quiz_history, name='quiz-history'),
 ]
-

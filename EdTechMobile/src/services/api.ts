@@ -111,34 +111,16 @@ export const generateQuiz = async (
   document?: any
 ) => {
   try {
-    const formData = new FormData();
-    
-    if (document) {
-      // For web, document might already be a File object
-      if (Platform.OS === 'web' && document.file) {
-        formData.append('document', document.file);
-      } else if (Platform.OS === 'web' && document instanceof File) {
-        formData.append('document', document);
-      } else {
-        // For mobile platforms
-        const documentFile = {
-          uri: document.uri,
-          type: document.mimeType || document.type || 'application/octet-stream',
-          name: document.name || 'document',
-        } as any;
-        formData.append('document', documentFile);
-      }
-    } else {
-      formData.append('topic', topic);
+    // Validate minimum text length
+    if (!topic || topic.trim().length < 50) {
+      throw new Error('Please provide text content with at least 50 characters');
     }
     
-    formData.append('num_questions', numQuestions.toString());
-    formData.append('difficulty', difficulty);
-    
-    const response = await api.post('/quiz/generate/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+    // Map difficulty to backend format
+    const response = await api.post('/quiz/generate/', {
+      topic: topic,
+      num_questions: numQuestions,
+      difficulty: difficulty
     });
     
     return response.data;
@@ -440,6 +422,102 @@ export const getBillingHistory = async (userId: string) => {
     return response.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.error || error.message || 'Failed to get billing history');
+  }
+};
+
+/**
+ * Daily Quiz API
+ */
+
+/**
+ * Get today's Daily Quiz
+ * @param userId - User identifier
+ */
+export const getDailyQuiz = async (userId: string) => {
+  try {
+    const response = await api.get('/daily-quiz/', {
+      params: { user_id: userId }
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get Daily Quiz');
+  }
+};
+
+/**
+ * Start the Daily Quiz and award participation coins
+ * @param userId - User identifier
+ * @param quizId - Quiz id returned from getDailyQuiz
+ */
+export const startDailyQuiz = async (userId: string, quizId: string) => {
+  try {
+    const response = await api.post('/daily-quiz/start/', {
+      user_id: userId,
+      quiz_id: quizId,
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to start Daily Quiz');
+  }
+};
+
+/**
+ * Submit Daily Quiz answers
+ * @param userId - User identifier
+ * @param quizId - Quiz ID
+ * @param answers - User's answers {question_id: option_index} e.g. {"1": 0, "2": 2}
+ * @param timeTaken - Time taken in seconds
+ */
+export const submitDailyQuiz = async (
+  userId: string,
+  quizId: string,
+  answers: Record<string, number>,
+  timeTaken: number
+) => {
+  try {
+    console.log('Submitting quiz:', { userId, quizId, answers, timeTaken });
+    const response = await api.post('/daily-quiz/submit/', {
+      user_id: userId,
+      quiz_id: quizId,
+      answers: answers,
+      time_taken_seconds: timeTaken,
+    });
+    console.log('Submit response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('Submit error:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to submit quiz');
+  }
+};
+
+/**
+ * Get user's coin balance and stats
+ * @param userId - User identifier
+ */
+export const getUserCoins = async (userId: string) => {
+  try {
+    const response = await api.get('/daily-quiz/coins/', {
+      params: { user_id: userId }
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get coins');
+  }
+};
+
+/**
+ * Get user's quiz history
+ * @param userId - User identifier
+ * @param limit - Number of records to fetch
+ */
+export const getQuizHistory = async (userId: string, limit: number = 30) => {
+  try {
+    const response = await api.get('/daily-quiz/history/', {
+      params: { user_id: userId, limit: limit }
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get quiz history');
   }
 };
 

@@ -1,8 +1,19 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import jwtDecode from 'jwt-decode';
+import { Platform } from 'react-native';
 
-const API_BASE_URL = 'http://localhost:8003/api';
+const getAuthApiUrl = () => {
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:8003/api';
+  }
+  if (Platform.OS === 'ios') {
+    return 'http://localhost:8003/api';
+  }
+  return 'http://localhost:8003/api';
+};
+
+const API_BASE_URL = getAuthApiUrl();
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'access_token';

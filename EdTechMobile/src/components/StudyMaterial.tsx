@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
+import AnimatedLoader from './AnimatedLoader';
 
 interface Concept {
   name: string;
@@ -34,8 +35,7 @@ export const StudyMaterial: React.FC<StudyMaterialProps> = ({ studyMaterialData,
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Analyzing document and generating study material...</Text>
+        <AnimatedLoader visible={true} size="large" />
         <Text style={styles.loadingSubtext}>This may take a few seconds</Text>
       </View>
     );

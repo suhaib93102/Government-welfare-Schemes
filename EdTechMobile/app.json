@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "scheme": "edtechsolver",
     "newArchEnabled": true,
     "platforms": [
       "ios",
@@ -46,6 +47,16 @@
     "plugins": [
       "expo-secure-store",
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "googleAuth": {
+        "scheme": "edtechsolver",
+        "redirectPath": "auth/callback",
+        "webClientId": "151162974342-2ngie326605cieaj916qjrqq7ud5m1aj.apps.googleusercontent.com",
+        "iosClientId": "151162974342-2ngie326605cieaj916qjrqq7ud5m1aj.apps.googleusercontent.com",
+        "androidClientId": "151162974342-2ngie326605cieaj916qjrqq7ud5m1aj.apps.googleusercontent.com",
+        "expoClientId": "151162974342-2ngie326605cieaj916qjrqq7ud5m1aj.apps.googleusercontent.com"
+      }
+    }
   }
 }

@@ -100,6 +100,25 @@ Rules:
                 'details': str(e)
             }
         except Exception as e:
+            # Handle quota errors from Google's client explicitly
+            try:
+                from google.api_core.exceptions import ResourceExhausted
+            except Exception:
+                ResourceExhausted = None
+
+            if ResourceExhausted and isinstance(e, ResourceExhausted):
+                import re
+                m = re.search(r'retry_delay\s*\{\s*seconds:\s*(\d+)', str(e))
+                retry_seconds = int(m.group(1)) if m else None
+                logger.warning(f"Quota exceeded for Gemini API: retry in {retry_seconds}s")
+
+                return {
+                    'success': False,
+                    'error': 'quota_exceeded',
+                    'details': str(e),
+                    'retry_after_seconds': retry_seconds
+                }
+
             logger.error(f"Quiz generation error: {e}", exc_info=True)
             return {
                 'success': False,
@@ -174,6 +193,43 @@ Rules:
                 'details': str(e)
             }
         except Exception as e:
+            # Handle quota-exceeded specifically
+            try:
+                from google.api_core.exceptions import ResourceExhausted
+            except Exception:
+                ResourceExhausted = None
+
+            if ResourceExhausted and isinstance(e, ResourceExhausted):
+                import re
+                m = re.search(r'retry_delay\s*\{\s*seconds:\s*(\d+)', str(e))
+                retry_seconds = int(m.group(1)) if m else None
+                logger.warning(f"Quota exceeded for Gemini API (flashcards): retry in {retry_seconds}s")
+
+                return {
+                    'success': False,
+                    'error': 'quota_exceeded',
+                    'details': str(e),
+                    'retry_after_seconds': retry_seconds
+                }
+
+            # Handle quota-exceeded specifically
+            try:
+                from google.api_core.exceptions import ResourceExhausted
+            except Exception:
+                ResourceExhausted = None
+
+            if ResourceExhausted and isinstance(e, ResourceExhausted):
+                import re
+                m = re.search(r'retry_delay\s*\{\s*seconds:\s*(\d+)', str(e))
+                retry_seconds = int(m.group(1)) if m else None
+                logger.warning(f"Quota exceeded for Gemini API (flashcards): retry in {retry_seconds}s")
+                return {
+                    'success': False,
+                    'error': 'quota_exceeded',
+                    'details': str(e),
+                    'retry_after_seconds': retry_seconds
+                }
+
             logger.error(f"Flashcard generation error: {e}", exc_info=True)
             return {
                 'success': False,
@@ -181,6 +237,8 @@ Rules:
                 'details': str(e)
             }
     
+
+
     def generate_from_document(self, document_text: str, content_type: str = 'quiz', 
                                num_items: int = 5) -> Dict[str, Any]:
         """
@@ -305,10 +363,108 @@ Document Text:
                 'details': str(e)
             }
         except Exception as e:
+            # Handle quota-exceeded specifically
+            try:
+                from google.api_core.exceptions import ResourceExhausted
+            except Exception:
+                ResourceExhausted = None
+
+            if ResourceExhausted and isinstance(e, ResourceExhausted):
+                import re
+                m = re.search(r'retry_delay\s*\{\s*seconds:\s*(\d+)', str(e))
+                retry_seconds = int(m.group(1)) if m else None
+                logger.warning(f"Quota exceeded for Gemini API (study material): retry in {retry_seconds}s")
+                return {
+                    'success': False,
+                    'error': 'quota_exceeded',
+                    'details': str(e),
+                    'retry_after_seconds': retry_seconds
+                }
+
             logger.error(f"Study material generation error: {e}", exc_info=True)
             return {
                 'success': False,
                 'error': 'Failed to generate study material',
+                'details': str(e)
+            }
+    
+    def generate_daily_quiz(self, num_questions: int = 10) -> Dict[str, Any]:
+        """
+        Generate a daily general knowledge quiz with varied categories
+        
+        Args:
+            num_questions: Number of questions to generate (default: 10)
+        
+        Returns:
+            Dictionary containing quiz questions with varied categories
+        """
+        try:
+            prompt = f"""Generate a daily general knowledge quiz with {num_questions} multiple-choice questions covering various categories like Science, History, Geography, Literature, Current Events, Sports, Technology, etc.
+
+Make the questions interesting, educational, and suitable for a general audience. Mix easy and medium difficulty questions.
+
+Please format the response as a valid JSON object with the following structure:
+{{
+    "questions": [
+        {{
+            "question_text": "Question text here?",
+            "options": [
+                {{"id": "A", "text": "Option A text"}},
+                {{"id": "B", "text": "Option B text"}},
+                {{"id": "C", "text": "Option C text"}},
+                {{"id": "D", "text": "Option D text"}}
+            ],
+            "correct_answer": "C",
+            "category": "science",
+            "difficulty": "medium",
+            "explanation": "Explanation of the correct answer",
+            "fun_fact": "An interesting related fact"
+        }}
+    ]
+}}
+
+Rules:
+- Make questions clear and engaging
+- Use varied categories: science, history, geography, general, current_events, sports, entertainment, technology
+- Mix difficulty levels (mostly easy and medium)
+- correct_answer should be "A", "B", "C", or "D"
+- Include explanations and fun facts
+- Ensure JSON is properly formatted
+"""
+            
+            logger.info(f"Generating Daily Quiz with {num_questions} questions")
+            response = self.model.generate_content(prompt)
+            
+            # Extract JSON from response
+            response_text = response.text.strip()
+            
+            # Try to extract JSON from markdown code blocks if present
+            if '```json' in response_text:
+                response_text = response_text.split('```json')[1].split('```')[0].strip()
+            elif '```' in response_text:
+                response_text = response_text.split('```')[1].split('```')[0].strip()
+            
+            quiz_data = json.loads(response_text)
+            
+            logger.info(f"Successfully generated {len(quiz_data.get('questions', []))} Daily Quiz questions")
+            return {
+                'success': True,
+                'questions': quiz_data.get('questions', [])
+            }
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response: {e}")
+            logger.error(f"Response text: {response_text}")
+            return {
+                'success': False,
+                'error': 'Failed to parse Daily Quiz data',
+                'details': str(e)
+            }
+        except Exception as e:
+            logger.error(f"Daily Quiz generation error: {e}", exc_info=True)
+            return {
+                'success': False,
+                'error': 'Failed to generate Daily Quiz',
                 'details': str(e)
             }
 

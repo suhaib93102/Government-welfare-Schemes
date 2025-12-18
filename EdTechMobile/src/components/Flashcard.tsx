@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Animated, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Dimensions, Platform, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
+import { TextInputComponent } from './TextInput';
+import { ImageUpload } from './ImageUpload';
+import AnimatedLoader from './AnimatedLoader';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -23,9 +26,13 @@ interface FlashcardData {
 interface FlashcardProps {
   flashcardData: FlashcardData | null;
   loading: boolean;
+  onTextSubmit?: (text: string) => void;
+  onImageSubmit?: (imageUri: string) => void;
 }
 
-export const Flashcard: React.FC<FlashcardProps> = ({ flashcardData, loading }) => {
+export const Flashcard: React.FC<FlashcardProps> = ({ flashcardData, loading, onTextSubmit, onImageSubmit }) => {
+  const [activeTab, setActiveTab] = useState<'text' | 'image'>('text');
+  const [activeMethod, setActiveMethod] = useState<'text' | 'image'>('text');
   const [currentCard, setCurrentCard] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [flipAnimation] = useState(new Animated.Value(0));
@@ -35,14 +42,48 @@ export const Flashcard: React.FC<FlashcardProps> = ({ flashcardData, loading }) 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Generating flashcards...</Text>
+        <AnimatedLoader visible={true} size="large" />
       </View>
     );
   }
 
   if (!flashcardData) {
-    return null;
+    return (
+      <View style={styles.emptyContainer}>
+        <View style={styles.inputCardFlash}>
+          <View style={styles.cardTabsFlash}>
+            <TouchableOpacity
+              style={[styles.cardTabFlash, styles.cardTabLeftFlash, activeMethod === 'text' && styles.cardTabActiveFlash]}
+              onPress={() => setActiveMethod('text')}
+            >
+              <MaterialIcons name="text-fields" size={20} color={activeMethod === 'text' ? colors.white : colors.textMuted} />
+              <Text style={[styles.cardTabTextFlash, activeMethod === 'text' && styles.cardTabTextActiveFlash]}>Text Input</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.cardTabFlash, styles.cardTabRightFlash, activeMethod === 'image' && styles.cardTabActiveFlash]}
+              onPress={() => setActiveMethod('image')}
+            >
+              <MaterialIcons name="image" size={18} color={activeMethod === 'image' ? colors.white : colors.textMuted} />
+              <Text style={[styles.cardTabTextFlash, activeMethod === 'image' && styles.cardTabTextActiveFlash]}>Image Upload</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.cardContentFlash}>
+            {activeMethod === 'text' ? (
+              <TextInputComponent
+                onSubmit={(text) => onTextSubmit?.(text)}
+                placeholder="Enter topic for flashcards (e.g., 'Biology Cells', 'Math Formulas')..."
+              />
+            ) : (
+              <ImageUpload
+                onSubmit={(imageUri) => onImageSubmit?.(imageUri)}
+              />
+            )}
+          </View>
+        </View>
+      </View>
+    );
   }
 
   const card = flashcardData.cards[currentCard];
@@ -51,7 +92,7 @@ export const Flashcard: React.FC<FlashcardProps> = ({ flashcardData, loading }) 
     Animated.timing(flipAnimation, {
       toValue: isFlipped ? 0 : 1,
       duration: 300,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
     setIsFlipped(!isFlipped);
   };
@@ -505,5 +546,105 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontWeight: '600',
     textAlign: 'center',
+  },
+
+  // Empty state with tabs
+  emptyContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.white,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    ...shadows.sm,
+  },
+  activeTab: {
+    backgroundColor: colors.primary,
+  },
+  tabText: {
+    ...typography.h4,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  activeTabText: {
+    color: colors.white,
+  },
+  inputSection: {
+    flex: 1,
+  },
+  // Horizontal layout for desktop
+  horizontalWrapper: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
+  leftColumnFlash: {
+    flex: 1.2,
+  },
+  rightColumnFlash: {
+    flex: 1,
+  },
+  // Card styles for Flashcard input area
+  inputCardFlash: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.lg,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    ...shadows.sm,
+  },
+  cardTabsFlash: {
+    flexDirection: 'row',
+    padding: spacing.sm,
+    gap: spacing.sm,
+  },
+  cardTabFlash: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.lg * 1.1,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.xl,
+  },
+  cardTabLeftFlash: {
+    flex: 1,
+    borderTopLeftRadius: borderRadius.xl,
+    borderBottomLeftRadius: 0,
+  },
+  cardTabRightFlash: {
+    flex: 1,
+    borderTopRightRadius: borderRadius.xl,
+    borderBottomRightRadius: 0,
+  },
+  cardTabActiveFlash: {
+    backgroundColor: colors.primary,
+    ...shadows.lg,
+    transform: [{ translateY: -2 }],
+  },
+  cardTabTextFlash: {
+    ...typography.h4,
+    color: colors.textMuted,
+    fontWeight: '700',
+  },
+  cardTabTextActiveFlash: {
+    color: colors.white,
+  },
+  cardContentFlash: {
+    padding: spacing.lg,
   },
 });

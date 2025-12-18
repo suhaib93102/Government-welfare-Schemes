@@ -130,7 +130,7 @@ class YouTubeSummarizeView(APIView):
                     summary_data['quiz_error'] = quiz_data.get('error')
             
             return Response(summary_data, status=status.HTTP_200_OK)
-        
+            
         except ValueError as e:
             # Handle known errors (invalid URL, no transcript, etc.)
             logger.error(f"ValueError in YouTube summarizer: {str(e)}")
@@ -147,6 +147,60 @@ class YouTubeSummarizeView(APIView):
                 {'error': f'An unexpected error occurred: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class YouTubeSummarizeViewDemo(APIView):
+    """Demo endpoint for YouTube summarizer testing"""
+    
+    def post(self, request):
+        generate_quiz = request.data.get('generate_quiz', False)
+        quiz_difficulty = request.data.get('quiz_difficulty', 'intermediate')
+        
+        demo_summary = {
+                'title': 'Demo: Photosynthesis Explained',
+                'channel_name': 'Demo Channel',
+                'video_duration': '6m 30s',
+                'summary': 'This demo video explains the basics of photosynthesis, including light reactions and the Calvin cycle.',
+                'notes': [
+                    'Photosynthesis converts light energy into chemical energy.',
+                    'Light reactions produce ATP and NADPH in the thylakoid membranes.',
+                    'Calvin cycle uses ATP and NADPH to fix CO2 into sugars.'
+                ],
+                'questions': [
+                    'What are the main phases of photosynthesis?',
+                    'Where do light reactions occur in the chloroplast?',
+                    'What are the primary products of the light-dependent reactions?',
+                    'What does the Calvin cycle accomplish?',
+                    'Why is chlorophyll important for photosynthesis?'
+                ],
+                'estimated_reading_time': '4 minutes',
+                'difficulty_level': 'Intermediate',
+                'keywords': ['photosynthesis', 'light reactions', 'Calvin cycle']
+            }
+
+        # Embed a non-persistent demo quiz if requested in the payload
+        if generate_quiz:
+            demo_quiz = {
+                'quiz_id': 'demo-quiz-1',
+                'title': 'Photosynthesis - Demo Quiz',
+                'total_questions': 5,
+                'difficulty': quiz_difficulty,
+                'estimated_time': 10,
+                'questions': [
+                    {
+                        'id': f'demo-{i+1}',
+                        'type': 'mcq',
+                        'question': demo_summary['questions'][i],
+                        'options': ['Option A', 'Option B', 'Option C', 'Option D'],
+                        'hint': 'Think about the main processes in photosynthesis.'
+                    }
+                    for i in range(min(5, len(demo_summary['questions'])))
+                ]
+            }
+            demo_summary['quiz'] = demo_quiz
+
+        return Response(demo_summary, status=status.HTTP_200_OK)
+
 
 
 

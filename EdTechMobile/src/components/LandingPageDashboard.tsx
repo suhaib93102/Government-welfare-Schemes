@@ -1,215 +1,117 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  Image,
+  ScrollView,
   Dimensions,
-  FlatList,
+  Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isWeb = Platform.OS === 'web';
+
 interface LandingPageDashboardProps {
-  onNavigateToFeature: (feature: string) => void;
-  onNavigateToPricing: () => void;
+  onGetStarted: () => void;
 }
 
-interface Feature {
-  id: string;
-  title: string;
-  description: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
-  color: string;
-}
-
-interface Testimonial {
-  id: string;
-  name: string;
-  role: string;
-  comment: string;
-  rating: number;
-}
-
-const FEATURES: Feature[] = [
+const FEATURES = [
   {
-    id: 'ask-question',
-    title: 'Ask Question',
-    description: 'Get instant answers with AI-powered solutions',
-    icon: 'help-outline',
-    color: '#FF6B6B',
+    icon: 'auto-awesome',
+    title: 'AI-Powered Solutions',
+    description: 'Get instant answers with advanced AI technology',
+    gradient: ['#6366F1', '#8B5CF6'],
   },
   {
-    id: 'predicted-questions',
-    title: 'Predicted Questions',
-    description: 'Practice with AI-generated exam questions',
-    icon: 'psychology',
-    color: '#4ECDC4',
-  },
-  {
-    id: 'quiz',
-    title: 'Smart Quiz',
-    description: 'Interactive quizzes with detailed explanations',
     icon: 'quiz',
-    color: '#FFD93D',
+    title: 'Smart Quizzes',
+    description: 'Generate custom quizzes from any topic',
+    gradient: ['#EC4899', '#8B5CF6'],
   },
   {
-    id: 'flashcards',
-    title: 'Flashcards',
-    description: 'Learn efficiently with spaced repetition',
     icon: 'style',
-    color: '#95E1D3',
+    title: 'Flashcards',
+    description: 'Create and study with intelligent flashcards',
+    gradient: ['#F59E0B', '#EC4899'],
   },
   {
-    id: 'youtube-summarizer',
-    title: 'Video Summarizer',
-    description: 'Get summaries and quizzes from YouTube videos',
-    icon: 'video-library',
-    color: '#F38181',
-  },
-];
-
-const TESTIMONIALS: Testimonial[] = [
-  {
-    id: '1',
-    name: 'Aarav Kumar',
-    role: 'Class 12 Student',
-    comment: 'This app helped me improve my scores by 20% in just 2 months!',
-    rating: 5,
+    icon: 'ondemand-video',
+    title: 'YouTube Summaries',
+    description: 'Summarize any video in seconds',
+    gradient: ['#10B981', '#059669'],
   },
   {
-    id: '2',
-    name: 'Priya Singh',
-    role: 'University Student',
-    comment: 'The AI answers are so detailed and helpful. Highly recommended!',
-    rating: 5,
+    icon: 'analytics',
+    title: 'Trends Analysis',
+    description: 'Exam trends and chapter weightage insights',
+    gradient: ['#7C3AED', '#5B21B6'],
   },
   {
-    id: '3',
-    name: 'Rohan Patel',
-    role: 'Competitive Exam Aspirant',
-    comment: 'Best study companion ever. The predicted questions are amazing!',
-    rating: 5,
+    icon: 'analytics',
+    title: 'Trends Analysis',
+    description: 'Exam trends, chapter weightage and study strategy',
+    gradient: ['#7C3AED', '#4C1D95'],
   },
 ];
 
 const STATS = [
-  { label: 'Active Students', value: '50K+' },
-  { label: 'Questions Answered', value: '1M+' },
-  { label: 'Success Rate', value: '94%' },
-  { label: 'Available Languages', value: '8' },
+  { value: '2.3s', label: 'Avg Response Time' },
+  { value: '98%', label: 'Accuracy Rate' },
+  { value: '30+', label: 'Languages' },
+  { value: '100K+', label: 'Questions Solved' },
 ];
 
-export const LandingPageDashboard: React.FC<LandingPageDashboardProps> = ({
-  onNavigateToFeature,
-  onNavigateToPricing,
-}) => {
-  const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
-
-  const renderFeatureCard = (feature: Feature) => (
-    <TouchableOpacity
-      key={feature.id}
-      style={styles.featureCard}
-      onPress={() => onNavigateToFeature(feature.id)}
-      activeOpacity={0.8}
-    >
-      <View
-        style={[
-          styles.featureIcon,
-          { backgroundColor: feature.color + '20' },
-        ]}
-      >
-        <MaterialIcons name={feature.icon} size={32} color={feature.color} />
-      </View>
-      <Text style={styles.featureTitle}>{feature.title}</Text>
-      <Text style={styles.featureDescription}>{feature.description}</Text>
-      <View style={styles.featureArrow}>
-        <MaterialIcons name="arrow-forward" size={20} color={feature.color} />
-      </View>
-    </TouchableOpacity>
-  );
-
-  const renderTestimonial = (testimonial: Testimonial) => (
-    <View key={testimonial.id} style={styles.testimonialCard}>
-      <View style={styles.testimonialHeader}>
-        <View>
-          <Text style={styles.testimonialName}>{testimonial.name}</Text>
-          <Text style={styles.testimonialRole}>{testimonial.role}</Text>
-        </View>
-        <View style={styles.ratingContainer}>
-          {Array.from({ length: testimonial.rating }).map((_, i) => (
-            <MaterialIcons
-              key={i}
-              name="star"
-              size={16}
-              color="#FFD93D"
-              style={{ marginRight: 2 }}
-            />
-          ))}
-        </View>
-      </View>
-      <Text style={styles.testimonialComment}>{testimonial.comment}</Text>
-    </View>
-  );
-
+export const LandingPageDashboard: React.FC<LandingPageDashboardProps> = ({ onGetStarted }) => {
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Hero Section */}
-      <View style={styles.heroSection}>
+      <LinearGradient
+        colors={['#6366F1', '#8B5CF6', '#EC4899']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.heroGradient}
+      >
         <View style={styles.heroContent}>
-          <Text style={styles.heroTag}>Your AI Study Partner</Text>
-          <Text style={styles.heroTitle}>Master Any Subject with AI-Powered Learning</Text>
-          <Text style={styles.heroSubtitle}>
-            Get instant answers, ace exams, and learn smarter with our revolutionary AI study platform
+          <View style={styles.heroIconContainer}>
+            <MaterialIcons name="school" size={64} color="#ffffff" />
+          </View>
+          
+          <Text style={styles.heroTitle}>
+            AI-Powered Education
           </Text>
-        </View>
+          
+          <Text style={styles.heroSubtitle}>
+            Transform your learning with intelligent question-solving, quizzes, and study tools
+          </Text>
 
-        {/* CTA Buttons */}
-        <View style={styles.ctaContainer}>
-          <TouchableOpacity style={styles.primaryButton}>
-            <MaterialIcons name="play-arrow" size={24} color={colors.white} />
-            <Text style={styles.primaryButtonText}>Get Started Free</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={onNavigateToPricing}
+          <TouchableOpacity 
+            style={styles.ctaButton}
+            onPress={onGetStarted}
+            activeOpacity={0.8}
           >
-            <MaterialIcons name="local-offer" size={24} color={colors.primary} />
-            <Text style={styles.secondaryButtonText}>View Pricing</Text>
+            <Text style={styles.ctaButtonText}>Get Started Free</Text>
+            <MaterialIcons name="arrow-forward" size={20} color={colors.primary} />
           </TouchableOpacity>
-        </View>
 
-        {/* Trust Indicators */}
-        <View style={styles.trustIndicators}>
-          <View style={styles.trustItem}>
-            <MaterialIcons name="verified" size={20} color={colors.success} />
-            <Text style={styles.trustText}>Secure & Private</Text>
-          </View>
-          <View style={styles.trustItem}>
-            <MaterialIcons name="auto-awesome" size={20} color={colors.primary} />
-            <Text style={styles.trustText}>AI-Powered</Text>
-          </View>
-          <View style={styles.trustItem}>
-            <MaterialIcons name="trending-up" size={20} color={colors.success} />
-            <Text style={styles.trustText}>Proven Results</Text>
+          {/* Stats Row */}
+          <View style={styles.statsContainer}>
+            {STATS.map((stat, index) => (
+              <View key={index} style={styles.statCard}>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </View>
+            ))}
           </View>
         </View>
-      </View>
-
-      {/* Stats Section */}
-      <View style={styles.statsSection}>
-        <Text style={styles.sectionTitle}>Trusted by Students Worldwide</Text>
-        <View style={styles.statsGrid}>
-          {STATS.map((stat, index) => (
-            <View key={index} style={styles.statCard}>
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
+      </LinearGradient>
 
       {/* Features Section */}
       <View style={styles.featuresSection}>
@@ -217,205 +119,83 @@ export const LandingPageDashboard: React.FC<LandingPageDashboardProps> = ({
         <Text style={styles.sectionSubtitle}>
           Everything you need to excel in your studies
         </Text>
+
         <View style={styles.featuresGrid}>
-          {FEATURES.map((feature) => renderFeatureCard(feature))}
+          {FEATURES.map((feature, index) => (
+            <View key={index} style={styles.featureCard}>
+              <LinearGradient
+                colors={feature.gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.featureIconGradient}
+              >
+                <MaterialIcons name={feature.icon as any} size={32} color="#ffffff" />
+              </LinearGradient>
+              
+              <Text style={styles.featureTitle}>{feature.title}</Text>
+              <Text style={styles.featureDescription}>{feature.description}</Text>
+            </View>
+          ))}
         </View>
       </View>
 
       {/* How It Works Section */}
       <View style={styles.howItWorksSection}>
         <Text style={styles.sectionTitle}>How It Works</Text>
+        <Text style={styles.sectionSubtitle}>
+          Three simple steps to smarter learning
+        </Text>
+
         <View style={styles.stepsContainer}>
           {[
-            {
-              number: '1',
-              title: 'Upload or Ask',
-              description: 'Upload images or type your questions',
-              icon: 'upload-file',
-            },
-            {
-              number: '2',
-              title: 'AI Processes',
-              description: 'Our AI analyzes and finds the best solution',
-              icon: 'auto-awesome',
-            },
-            {
-              number: '3',
-              title: 'Learn & Practice',
-              description: 'Get detailed answers and practice questions',
-              icon: 'school',
-            },
-            {
-              number: '4',
-              title: 'Track Progress',
-              description: 'Monitor your improvement over time',
-              icon: 'trending-up',
-            },
+            { number: '1', title: 'Ask or Upload', description: 'Type your question or upload an image', icon: 'add-photo-alternate' },
+            { number: '2', title: 'AI Processing', description: 'Our AI analyzes and solves instantly', icon: 'psychology' },
+            { number: '3', title: 'Learn & Practice', description: 'Get answers, quizzes, and flashcards', icon: 'school' },
           ].map((step, index) => (
             <View key={index} style={styles.stepCard}>
               <View style={styles.stepNumber}>
                 <Text style={styles.stepNumberText}>{step.number}</Text>
               </View>
+              
               <View style={styles.stepContent}>
-                <MaterialIcons name={step.icon as any} size={28} color={colors.primary} />
-                <View>
-                  <Text style={styles.stepTitle}>{step.title}</Text>
-                  <Text style={styles.stepDescription}>{step.description}</Text>
-                </View>
+                <MaterialIcons name={step.icon as any} size={40} color={colors.primary} />
+                <Text style={styles.stepTitle}>{step.title}</Text>
+                <Text style={styles.stepDescription}>{step.description}</Text>
               </View>
             </View>
           ))}
         </View>
       </View>
 
-      {/* Testimonials Section */}
-      <View style={styles.testimonialsSection}>
-        <Text style={styles.sectionTitle}>What Students Say</Text>
-        <View>
-          {TESTIMONIALS.map((testimonial) => renderTestimonial(testimonial))}
-        </View>
-      </View>
-
-      {/* Pricing Preview */}
-      <View style={styles.pricingPreviewSection}>
-        <Text style={styles.sectionTitle}>Simple & Transparent Pricing</Text>
-        <View style={styles.pricingPreviewContainer}>
-          {/* Free Tier */}
-          <View style={styles.pricingCard}>
-            <Text style={styles.pricingBadge}>Free</Text>
-            <View style={styles.pricingHeader}>
-              <Text style={styles.pricingPrice}>Free</Text>
-              <Text style={styles.pricingPeriod}>Forever</Text>
-            </View>
-            <View style={styles.pricingFeatures}>
-              {['3 Questions/month', '3 Quizzes/month', '3 Flashcards/month', 'Basic Support'].map(
-                (feature, i) => (
-                  <View key={i} style={styles.pricingFeature}>
-                    <MaterialIcons name="check-circle" size={20} color={colors.success} />
-                    <Text style={styles.pricingFeatureText}>{feature}</Text>
-                  </View>
-                )
-              )}
-            </View>
-            <TouchableOpacity style={styles.pricingButtonSecondary}>
-              <Text style={styles.pricingButtonSecondaryText}>Get Started</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Premium Tier */}
-          <View style={[styles.pricingCard, styles.pricingCardPremium]}>
-            <View style={styles.premiumBadge}>
-              <MaterialIcons name="star" size={16} color={colors.white} />
-              <Text style={styles.premiumBadgeText}>Most Popular</Text>
-            </View>
-            <View style={styles.pricingHeader}>
-              <View style={styles.pricingPriceContainer}>
-                <Text style={styles.pricingPricePremium}>₹1.99</Text>
-                <Text style={styles.pricingPeriodPremium}>/month</Text>
-              </View>
-            </View>
-            <View style={styles.pricingFeatures}>
-              {[
-                'Unlimited Questions',
-                'Unlimited Quizzes',
-                'Unlimited Flashcards',
-                'Video Summarizer',
-                'Priority Support',
-                'Auto-Pay Monthly',
-              ].map((feature, i) => (
-                <View key={i} style={styles.pricingFeature}>
-                  <MaterialIcons name="check-circle" size={20} color={colors.primary} />
-                  <Text style={styles.pricingFeatureText}>{feature}</Text>
-                </View>
-              ))}
-            </View>
-            <TouchableOpacity
-              style={styles.pricingButtonPrimary}
-              onPress={onNavigateToPricing}
-            >
-              <Text style={styles.pricingButtonPrimaryText}>Upgrade Now</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
-      {/* FAQ Section */}
-      <View style={styles.faqSection}>
-        <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
-        <View style={styles.faqContainer}>
-          {[
-            {
-              id: '1',
-              question: 'Is there really a free plan?',
-              answer: 'Yes! The free plan includes 3 uses per feature per month. No credit card required.',
-            },
-            {
-              id: '2',
-              question: 'Can I cancel Premium anytime?',
-              answer: 'Absolutely! You can cancel auto-pay anytime from your subscription settings.',
-            },
-            {
-              id: '3',
-              question: 'How accurate is the AI?',
-              answer: 'Our AI is trained on millions of educational resources and has 94% accuracy rate.',
-            },
-            {
-              id: '4',
-              question: 'Is my data secure?',
-              answer: 'Yes, we use bank-level encryption and never sell your data. Your privacy is our priority.',
-            },
-          ].map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.faqItem}
-              onPress={() => setExpandedFAQ(expandedFAQ === item.id ? null : item.id)}
-            >
-              <View style={styles.faqQuestion}>
-                <MaterialIcons
-                  name={expandedFAQ === item.id ? 'expand-less' : 'expand-more'}
-                  size={24}
-                  color={colors.primary}
-                />
-                <Text style={styles.faqQuestionText}>{item.question}</Text>
-              </View>
-              {expandedFAQ === item.id && (
-                <Text style={styles.faqAnswer}>{item.answer}</Text>
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Final CTA Section */}
-      <View style={styles.finalCtaSection}>
-        <Text style={styles.finalCtaTitle}>Ready to Transform Your Learning?</Text>
-        <Text style={styles.finalCtaSubtitle}>
-          Join thousands of students already using EdTech Solver
-        </Text>
-        <TouchableOpacity style={styles.finalCtaButton}>
-          <Text style={styles.finalCtaButtonText}>Start Your Free Trial</Text>
-          <MaterialIcons name="arrow-forward" size={20} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.finalCtaFooter}>No credit card required • Cancel anytime</Text>
+      {/* CTA Section */}
+      <View style={styles.ctaSection}>
+        <LinearGradient
+          colors={['#6366F1', '#8B5CF6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.ctaGradient}
+        >
+          <Text style={styles.ctaTitle}>Ready to Transform Your Learning?</Text>
+          <Text style={styles.ctaSubtitle}>
+            Join thousands of students already using AI to excel
+          </Text>
+          
+          <TouchableOpacity 
+            style={styles.ctaButtonSecondary}
+            onPress={onGetStarted}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.ctaButtonSecondaryText}>Start Learning Now</Text>
+            <MaterialIcons name="rocket-launch" size={20} color="#ffffff" />
+          </TouchableOpacity>
+        </LinearGradient>
       </View>
 
       {/* Footer */}
-      <View style={styles.footerSection}>
-        <View style={styles.footerContent}>
-          <Text style={styles.footerTitle}>EdTech Solver</Text>
-          <View style={styles.footerLinks}>
-            <TouchableOpacity>
-              <Text style={styles.footerLink}>Privacy Policy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity>
-              <Text style={styles.footerLink}>Terms of Service</Text>
-            </TouchableOpacity>
-            <TouchableOpacity>
-              <Text style={styles.footerLink}>Contact Us</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        <Text style={styles.copyright}>© 2024 EdTech Solver. All rights reserved.</Text>
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          © 2025 EdTech AI. Empowering learners worldwide.
+        </Text>
       </View>
     </ScrollView>
   );
@@ -424,185 +204,169 @@ export const LandingPageDashboard: React.FC<LandingPageDashboardProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundLight,
   },
-
-  /* Hero Section */
-  heroSection: {
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.white,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+  contentContainer: {
+    flexGrow: 1,
+  },
+  heroGradient: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl * 2,
+    paddingBottom: spacing.xxl,
+    minHeight: isWeb ? 600 : 500,
   },
   heroContent: {
-    marginBottom: spacing.xl,
+    alignItems: 'center',
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
   },
-  heroTag: {
-    ...typography.small,
-    fontWeight: '600',
-    color: colors.primary,
-    marginBottom: spacing.sm,
+  heroIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xl,
   },
   heroTitle: {
     ...typography.h1,
-    fontWeight: '700',
+    fontSize: isWeb ? 56 : 40,
+    color: '#ffffff',
+    textAlign: 'center',
     marginBottom: spacing.md,
-    lineHeight: 40,
+    fontWeight: '800',
   },
   heroSubtitle: {
     ...typography.body,
-    color: colors.textMuted,
-    lineHeight: 24,
+    fontSize: isWeb ? 20 : 18,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginBottom: spacing.xxl,
+    lineHeight: 28,
   },
-  ctaContainer: {
-    gap: spacing.md,
-    marginVertical: spacing.lg,
-  },
-  primaryButton: {
+  ctaButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    ...shadows.md,
-  },
-  primaryButtonText: {
-    ...typography.body,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.white,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-  },
-  secondaryButtonText: {
-    ...typography.body,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  trustIndicators: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    paddingTop: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  trustItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.lg,
+    borderRadius: borderRadius.full,
     gap: spacing.sm,
+    ...shadows.xl,
   },
-  trustText: {
-    ...typography.small,
-    color: colors.text,
-    fontWeight: '600',
+  ctaButtonText: {
+    ...typography.button,
+    color: colors.primary,
+    fontSize: 18,
+    fontWeight: '700',
   },
-
-  /* Stats Section */
-  statsSection: {
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
-  },
-  statsGrid: {
+  statsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
-    marginTop: spacing.lg,
+    justifyContent: 'center',
+    gap: spacing.lg,
+    marginTop: spacing.xxl,
+    width: '100%',
   },
   statCard: {
-    flex: 1,
-    minWidth: '48%',
-    backgroundColor: colors.white,
-    padding: spacing.lg,
-    borderRadius: borderRadius.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    minWidth: isWeb ? 140 : 80,
     alignItems: 'center',
-    ...shadows.sm,
   },
   statValue: {
-    ...typography.h2,
-    fontWeight: '700',
-    color: colors.primary,
-    marginBottom: spacing.sm,
+    fontSize: isWeb ? 32 : 24,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginBottom: 4,
   },
   statLabel: {
-    ...typography.small,
-    color: colors.textMuted,
+    fontSize: isWeb ? 14 : 12,
+    color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
   },
-
-  /* Features Section */
   featuresSection: {
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xxl * 2,
+    alignItems: 'center',
   },
   sectionTitle: {
     ...typography.h2,
+    fontSize: isWeb ? 40 : 32,
+    color: colors.textDark,
+    textAlign: 'center',
+    marginBottom: spacing.md,
     fontWeight: '700',
-    marginBottom: spacing.sm,
   },
   sectionSubtitle: {
     ...typography.body,
-    color: colors.textMuted,
-    marginBottom: spacing.lg,
+    fontSize: isWeb ? 18 : 16,
+    color: colors.textLight,
+    textAlign: 'center',
+    marginBottom: spacing.xxl,
   },
   featuresGrid: {
-    gap: spacing.md,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: spacing.xl,
+    maxWidth: 1200,
   },
   featureCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
-    ...shadows.sm,
+    backgroundColor: '#ffffff',
+    padding: spacing.xl,
+    borderRadius: borderRadius.xl,
+    width: isWeb ? 260 : SCREEN_WIDTH - spacing.xl * 2,
+    alignItems: 'center',
+    ...shadows.md,
   },
-  featureIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: borderRadius.md,
+  featureIconGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   featureTitle: {
-    ...typography.h4,
-    fontWeight: '700',
+    ...typography.h3,
+    fontSize: 20,
+    color: colors.textDark,
     marginBottom: spacing.sm,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   featureDescription: {
-    ...typography.small,
-    color: colors.textMuted,
-    marginBottom: spacing.md,
+    ...typography.body,
+    fontSize: 14,
+    color: colors.textLight,
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  featureArrow: {
-    alignItems: 'flex-start',
-  },
-
-  /* How It Works Section */
   howItWorksSection: {
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
     backgroundColor: colors.blue50,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xxl * 2,
+    alignItems: 'center',
   },
   stepsContainer: {
-    gap: spacing.lg,
-    marginTop: spacing.lg,
+    flexDirection: isWeb ? 'row' : 'column',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: spacing.xl,
+    maxWidth: 1200,
   },
   stepCard: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    alignItems: 'flex-start',
+    backgroundColor: '#ffffff',
+    padding: spacing.xl,
+    borderRadius: borderRadius.xl,
+    width: isWeb ? 300 : SCREEN_WIDTH - spacing.xl * 2,
+    alignItems: 'center',
+    ...shadows.md,
   },
   stepNumber: {
     width: 48,
@@ -611,276 +375,84 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: spacing.lg,
   },
   stepNumberText: {
-    ...typography.h3,
-    fontWeight: '700',
-    color: colors.white,
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#ffffff',
   },
   stepContent: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
+    alignItems: 'center',
   },
   stepTitle: {
-    ...typography.h4,
-    fontWeight: '700',
+    ...typography.h3,
+    fontSize: 20,
+    color: colors.textDark,
+    marginTop: spacing.md,
     marginBottom: spacing.sm,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   stepDescription: {
-    ...typography.small,
-    color: colors.textMuted,
-  },
-
-  /* Testimonials Section */
-  testimonialsSection: {
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
-  },
-  testimonialCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FFD93D',
-    ...shadows.sm,
-  },
-  testimonialHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  testimonialName: {
     ...typography.body,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  testimonialRole: {
-    ...typography.small,
-    color: colors.textMuted,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-  },
-  testimonialComment: {
-    ...typography.body,
-    color: colors.text,
-    lineHeight: 22,
-    fontStyle: 'italic',
-  },
-
-  /* Pricing Preview Section */
-  pricingPreviewSection: {
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
-  },
-  pricingPreviewContainer: {
-    gap: spacing.lg,
-    marginTop: spacing.lg,
-  },
-  pricingCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.border,
-    ...shadows.sm,
-  },
-  pricingCardPremium: {
-    borderColor: colors.primary,
-    borderWidth: 2,
-  },
-  pricingBadge: {
-    ...typography.small,
-    fontWeight: '600',
-    color: colors.textMuted,
-    marginBottom: spacing.md,
-  },
-  premiumBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.sm,
-    alignSelf: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  premiumBadgeText: {
-    ...typography.small,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  pricingHeader: {
-    marginBottom: spacing.lg,
-  },
-  pricingPrice: {
-    ...typography.h2,
-    fontWeight: '700',
-    marginBottom: spacing.sm,
-  },
-  pricingPriceContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.sm,
-  },
-  pricingPricePremium: {
-    ...typography.h1,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  pricingPeriod: {
-    ...typography.small,
-    color: colors.textMuted,
-  },
-  pricingPeriodPremium: {
-    ...typography.body,
-    color: colors.textMuted,
-  },
-  pricingFeatures: {
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  pricingFeature: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  pricingFeatureText: {
-    ...typography.body,
-    color: colors.text,
-  },
-  pricingButtonPrimary: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  pricingButtonPrimaryText: {
-    ...typography.body,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  pricingButtonSecondary: {
-    backgroundColor: colors.blue50,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  pricingButtonSecondaryText: {
-    ...typography.body,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-
-  /* FAQ Section */
-  faqSection: {
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.blue50,
-  },
-  faqContainer: {
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-  faqItem: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
-  },
-  faqQuestion: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  faqQuestionText: {
-    flex: 1,
-    ...typography.body,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  faqAnswer: {
-    ...typography.body,
-    color: colors.textMuted,
-    marginTop: spacing.md,
-    lineHeight: 22,
-  },
-
-  /* Final CTA Section */
-  finalCtaSection: {
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    marginBottom: spacing.xl,
-  },
-  finalCtaTitle: {
-    ...typography.h2,
-    fontWeight: '700',
-    color: colors.white,
+    fontSize: 14,
+    color: colors.textLight,
     textAlign: 'center',
-    marginBottom: spacing.md,
+    lineHeight: 20,
   },
-  finalCtaSubtitle: {
-    ...typography.body,
-    color: colors.white + '90',
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  finalCtaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
+  ctaSection: {
     paddingHorizontal: spacing.xl,
-    marginBottom: spacing.md,
+    paddingVertical: spacing.xxl * 2,
   },
-  finalCtaButtonText: {
+  ctaGradient: {
+    padding: spacing.xxl,
+    borderRadius: borderRadius.xl,
+    alignItems: 'center',
+    maxWidth: 800,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  ctaTitle: {
+    ...typography.h2,
+    fontSize: isWeb ? 36 : 28,
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    fontWeight: '700',
+  },
+  ctaSubtitle: {
     ...typography.body,
-    fontWeight: '700',
-    color: colors.primary,
+    fontSize: isWeb ? 18 : 16,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginBottom: spacing.xxl,
   },
-  finalCtaFooter: {
-    ...typography.small,
-    color: colors.white + '80',
-  },
-
-  /* Footer Section */
-  footerSection: {
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.black,
-    alignItems: 'center',
-  },
-  footerContent: {
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  footerTitle: {
-    ...typography.h4,
-    fontWeight: '700',
-    color: colors.white,
-    marginBottom: spacing.md,
-  },
-  footerLinks: {
+  ctaButtonSecondary: {
     flexDirection: 'row',
-    gap: spacing.lg,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: spacing.xxl,
+    paddingVertical: spacing.lg,
+    borderRadius: borderRadius.full,
+    gap: spacing.sm,
+    borderWidth: 2,
+    borderColor: '#ffffff',
   },
-  footerLink: {
-    ...typography.small,
-    color: colors.textMuted,
+  ctaButtonSecondaryText: {
+    ...typography.button,
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
   },
-  copyright: {
-    ...typography.small,
-    color: colors.textMuted,
+  footer: {
+    paddingVertical: spacing.xxl,
+    alignItems: 'center',
+    backgroundColor: colors.backgroundGray,
+  },
+  footerText: {
+    ...typography.caption,
+    color: colors.textLight,
+    textAlign: 'center',
   },
 });

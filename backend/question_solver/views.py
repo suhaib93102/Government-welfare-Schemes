@@ -428,10 +428,21 @@ class QuizGeneratorView(APIView):
             # Generate quiz using Gemini
             logger.info(f"Generating quiz with {num_questions} questions, difficulty: {difficulty}")
             result = gemini_service.generate_quiz(topic, num_questions, difficulty)
-            
-            if result['success']:
-                return Response(result['quiz'], status=status.HTTP_200_OK)
+
+            if result.get('success'):
+                return Response(result.get('quiz'), status=status.HTTP_200_OK)
             else:
+                # Handle quota exceeded by returning 429 with Retry-After
+                if result.get('error') == 'quota_exceeded':
+                    retry_seconds = result.get('retry_after_seconds')
+                    headers = {}
+                    if retry_seconds:
+                        headers['Retry-After'] = str(retry_seconds)
+                    return Response({
+                        'error': 'Quota exceeded for AI service',
+                        'details': result.get('details', '')
+                    }, status=status.HTTP_429_TOO_MANY_REQUESTS, headers=headers)
+
                 return Response({
                     'error': result.get('error', 'Failed to generate quiz'),
                     'details': result.get('details', '')
@@ -518,10 +529,20 @@ class FlashcardGeneratorView(APIView):
             # Generate flashcards using Gemini
             logger.info(f"Generating {num_cards} flashcards")
             result = gemini_service.generate_flashcards(topic, num_cards)
-            
-            if result['success']:
-                return Response(result['flashcards'], status=status.HTTP_200_OK)
+
+            if result.get('success'):
+                return Response(result.get('flashcards'), status=status.HTTP_200_OK)
             else:
+                if result.get('error') == 'quota_exceeded':
+                    retry_seconds = result.get('retry_after_seconds')
+                    headers = {}
+                    if retry_seconds:
+                        headers['Retry-After'] = str(retry_seconds)
+                    return Response({
+                        'error': 'Quota exceeded for AI service',
+                        'details': result.get('details', '')
+                    }, status=status.HTTP_429_TOO_MANY_REQUESTS, headers=headers)
+
                 return Response({
                     'error': result.get('error', 'Failed to generate flashcards'),
                     'details': result.get('details', '')
@@ -615,9 +636,16 @@ class StudyMaterialGeneratorView(APIView):
             logger.info("Generating comprehensive study material")
             result = gemini_service.generate_study_material(text_content)
             
-            if result['success']:
-                return Response(result['study_material'], status=status.HTTP_200_OK)
+            if result.get('success'):
+                return Response(result.get('study_material'), status=status.HTTP_200_OK)
             else:
+                if result.get('error') == 'quota_exceeded':
+                    retry_after = result.get('retry_after_seconds')
+                    headers = {}
+                    if retry_after is not None:
+                        headers['Retry-After'] = str(retry_after)
+                    return Response({'error': 'Quota exceeded', 'details': result.get('details')}, status=status.HTTP_429_TOO_MANY_REQUESTS, headers=headers)
+
                 return Response({
                     'error': result.get('error', 'Failed to generate study material'),
                     'details': result.get('details', '')
@@ -1087,7 +1115,29 @@ RULES FOR QUESTIONS:
 """
 
             model = gemini_service.model or __import__('google.generativeai', fromlist=['GenerativeModel']).GenerativeModel('gemini-2.5-flash')
-            response = model.generate_content(prompt)
+            try:
+                response = model.generate_content(prompt)
+            except Exception as e:
+                # Handle quota exceeded specifically
+                try:
+                    from google.api_core.exceptions import ResourceExhausted
+                except Exception:
+                    ResourceExhausted = None
+
+                if ResourceExhausted and isinstance(e, ResourceExhausted):
+                    import re
+                    retry_seconds = None
+                    m = re.search(r'retry_delay\s*\{\s*seconds:\s*(\d+)', str(e))
+                    retry_seconds = int(m.group(1)) if m else None
+
+                    headers = {}
+                    if retry_seconds:
+                        headers['Retry-After'] = str(retry_seconds)
+                    logger.warning(f"Quota exceeded for Gemini API (predicted questions): retry in {retry_seconds}s")
+                    return Response({ 'error': 'Quota exceeded for AI service', 'details': str(e) }, status=status.HTTP_429_TOO_MANY_REQUESTS, headers=headers)
+
+                logger.error(f"Predicted questions generation error: {e}", exc_info=True)
+                return Response({ 'error': 'Failed to generate predicted questions', 'details': str(e) }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
             if not response.text:
                 logger.error("Empty response from Gemini API")

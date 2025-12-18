@@ -6,9 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   FlatList,
+  Modal,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
+import { getDailyQuiz } from '../services/api';
+import { getUserCoins } from '../services/api';
+import { DailyQuizScreen } from './DailyQuizScreen';
 
 interface MainDashboardProps {
   userName: string;
@@ -34,39 +38,67 @@ interface QuickAccess {
 
 const QUICK_ACCESS: QuickAccess[] = [
   {
-    id: 'ask',
-    title: 'Ask Question',
-    icon: 'help-outline',
-    color: '#FF6B6B',
-    feature: 'ask-question',
+    id: 'profile',
+    title: 'Profile',
+    icon: 'person',
+    color: '#5B6DCD',
+    feature: 'profile',
   },
   {
     id: 'quiz',
-    title: 'Take Quiz',
+    title: 'Quiz',
     icon: 'quiz',
     color: '#FFD93D',
     feature: 'quiz',
   },
   {
     id: 'flashcard',
-    title: 'Flashcards',
+    title: 'Flash Cards',
     icon: 'style',
     color: '#95E1D3',
     feature: 'flashcards',
   },
   {
+    id: 'ask',
+    title: 'Ask Questions',
+    icon: 'help-outline',
+    color: '#FF6B6B',
+    feature: 'ask-question',
+  },
+  {
     id: 'predicted',
-    title: 'Practice',
+    title: 'Predicted Questions',
     icon: 'psychology',
     color: '#4ECDC4',
     feature: 'predicted-questions',
   },
   {
     id: 'video',
-    title: 'Summarize',
+    title: 'YouTube Summarizer',
     icon: 'video-library',
     color: '#F38181',
     feature: 'youtube-summarizer',
+  },
+  {
+    id: 'trends',
+    title: 'Trends',
+    icon: 'analytics',
+    color: '#7C3AED',
+    feature: 'trends',
+  },
+  {
+    id: 'dailyQuiz',
+    title: 'Daily Quiz',
+    icon: 'emoji-events',
+    color: '#FFD700',
+    feature: 'daily-quiz',
+  },
+  {
+    id: 'upload',
+    title: 'Upload Document',
+    icon: 'upload-file',
+    color: '#A29BFE',
+    feature: 'upload-document',
   },
 ];
 
@@ -81,6 +113,41 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
     hoursLearned: 15.5,
     currentStreak: 5,
   });
+  
+  const [userCoins, setUserCoins] = useState(0);
+  const [showDailyQuiz, setShowDailyQuiz] = useState(false);
+  const [dailyQuizAvailable, setDailyQuizAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    loadUserCoins();
+    checkDailyQuizStatus();
+  }, []);
+
+  const loadUserCoins = async () => {
+    try {
+      const data = await getUserCoins(userName || 'anonymous');
+      setUserCoins(data.total_coins || 0);
+    } catch (error) {
+      console.error('Failed to load coins:', error);
+    }
+  };
+
+  const checkDailyQuizStatus = async () => {
+    try {
+      const data = await getDailyQuiz(userName || 'anonymous');
+      // If already_attempted is true, quiz is not available
+      if (data.already_attempted) setDailyQuizAvailable(false);
+      else setDailyQuizAvailable(true);
+    } catch (error) {
+      // If 404 or error, treat as not available
+      setDailyQuizAvailable(false);
+    }
+  };
+
+  const handleDailyQuizComplete = () => {
+    setShowDailyQuiz(false);
+    loadUserCoins(); // Refresh coins after completing quiz
+  };
 
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([
     {
@@ -134,7 +201,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           { backgroundColor: item.color + '20' },
         ]}
       >
-        <MaterialIcons name={item.icon} size={28} color={item.color} />
+        <MaterialIcons name={item.icon} size={32} color={item.color} />
       </View>
       <Text style={styles.quickAccessText}>{item.title}</Text>
     </TouchableOpacity>
@@ -179,21 +246,47 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   );
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Welcome Section */}
-      <View style={styles.welcomeSection}>
-        <View style={styles.welcomeContent}>
-          <Text style={styles.welcomeText}>Welcome back,</Text>
-          <Text style={styles.userName}>{userName}! 👋</Text>
-          <Text style={styles.motivationalText}>
-            Keep up your {userStats.currentStreak}-day streak! You're doing amazing!
-          </Text>
+    <>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        {/* Welcome Section */}
+        <View style={styles.welcomeSection}>
+          <View style={styles.welcomeContent}>
+            <Text style={styles.welcomeText}>Welcome back,</Text>
+            <Text style={styles.userName}>{userName}! 👋</Text>
+            <Text style={styles.motivationalText}>
+              Keep up your {userStats.currentStreak}-day streak! You're doing amazing!
+            </Text>
+          </View>
+          <View style={styles.coinsBadge}>
+            <MaterialIcons name="monetization-on" size={24} color="#FFD700" />
+            <Text style={styles.coinsCount}>{userCoins}</Text>
+          </View>
         </View>
-        <View style={styles.streakBadge}>
-          <MaterialIcons name="local-fire" size={24} color="#FF6B6B" />
-          <Text style={styles.streakCount}>{userStats.currentStreak}</Text>
-        </View>
-      </View>
+
+        {/* Daily Quiz Banner */}
+        <TouchableOpacity 
+          style={styles.dailyQuizBanner}
+          onPress={() => setShowDailyQuiz(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.dailyQuizContent}>
+            <View style={styles.dailyQuizIcon}>
+              <MaterialIcons name="emoji-events" size={32} color="#FFD700" />
+            </View>
+            <View style={styles.dailyQuizText}>
+              <Text style={styles.dailyQuizTitle}>Daily Quiz 🎯</Text>
+              <Text style={styles.dailyQuizSubtitle}>
+                Answer 5 questions • Earn up to 35 coins
+              </Text>
+              {dailyQuizAvailable !== null && (
+                <View style={[styles.dailyBadge, dailyQuizAvailable ? styles.dailyBadgeAvailable : styles.dailyBadgeDone]}>
+                  <Text style={[styles.dailyBadgeText, dailyQuizAvailable ? styles.dailyBadgeTextAvailable : styles.dailyBadgeTextDone]}>{dailyQuizAvailable ? 'Available' : 'Completed'}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+          <MaterialIcons name="arrow-forward" size={24} color={colors.white} />
+        </TouchableOpacity>
 
       {/* Subscription Banner */}
       {subscriptionStatus.plan === 'free' && (
@@ -303,7 +396,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
 
       {/* Quick Access */}
       <View style={styles.quickAccessSection}>
-        <Text style={styles.sectionTitle}>Quick Access</Text>
+        <Text style={styles.sectionTitle}>Features</Text>
         <View style={styles.quickAccessGrid}>
           {QUICK_ACCESS.map((item) => renderQuickAccessItem(item))}
         </View>
@@ -389,6 +482,21 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </TouchableOpacity>
       </View>
     </ScrollView>
+
+    {/* Daily Quiz Modal */}
+    <Modal
+      visible={showDailyQuiz}
+      animationType="slide"
+      presentationStyle="fullScreen"
+    >
+      <DailyQuizScreen
+        visible={showDailyQuiz}
+        userId={userName || 'anonymous'}
+        onComplete={handleDailyQuizComplete}
+        onClose={() => setShowDailyQuiz(false)}
+      />
+    </Modal>
+    </>
   );
 };
 
@@ -426,6 +534,20 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textMuted,
   },
+  coinsBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FFD70020',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coinsCount: {
+    ...typography.h3,
+    fontWeight: '700',
+    color: '#FFD700',
+    marginTop: spacing.xs,
+  },
   streakBadge: {
     width: 72,
     height: 72,
@@ -439,6 +561,47 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FF6B6B',
     marginTop: spacing.xs,
+  },
+
+  /* Daily Quiz Banner */
+  dailyQuizBanner: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    marginBottom: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    ...shadows.md,
+  },
+  dailyQuizContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  dailyQuizIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.white + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dailyQuizText: {
+    flex: 1,
+  },
+  dailyQuizTitle: {
+    ...typography.h3,
+    fontWeight: '700',
+    color: colors.white,
+    marginBottom: spacing.xs,
+  },
+  dailyQuizSubtitle: {
+    ...typography.small,
+    color: colors.white + 'DD',
   },
 
   /* Subscription Banner */
@@ -586,30 +749,33 @@ const styles = StyleSheet.create({
   quickAccessGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: spacing.md,
   },
   quickAccessCard: {
-    flex: 1,
-    minWidth: '30%',
+    width: '48%',
     backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 140,
     ...shadows.sm,
   },
   quickAccessIcon: {
-    width: 48,
-    height: 48,
+    width: 56,
+    height: 56,
     borderRadius: borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
   },
   quickAccessText: {
-    ...typography.small,
+    ...typography.body,
     fontWeight: '600',
     textAlign: 'center',
     color: colors.text,
+    fontSize: 14,
   },
 
   /* Activity Section */
@@ -672,6 +838,66 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontWeight: '700',
     color: colors.white,
+  },
+
+  dailyQuizBanner: {
+    backgroundColor: colors.primary,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
+    marginTop: spacing.lg,
+    marginHorizontal: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dailyQuizContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+  },
+  dailyQuizIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dailyQuizText: {
+    flex: 1,
+  },
+  dailyQuizTitle: {
+    ...typography.h4,
+    color: colors.white,
+    fontWeight: '700',
+  },
+  dailyQuizSubtitle: {
+    ...typography.small,
+    color: colors.white,
+    marginTop: spacing.xs,
+  },
+  dailyBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+    marginTop: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  dailyBadgeAvailable: {
+    backgroundColor: colors.white,
+  },
+  dailyBadgeDone: {
+    backgroundColor: colors.white + '40',
+  },
+  dailyBadgeText: {
+    ...typography.small,
+    fontWeight: '700',
+  },
+  dailyBadgeTextAvailable: {
+    color: colors.primary,
+  },
+  dailyBadgeTextDone: {
+    color: colors.textMuted,
   },
 
   /* Tips Section */

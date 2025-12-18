@@ -1,36 +1,87 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   ScrollView,
+  FlatList,
   TouchableOpacity,
+  StyleSheet,
+  Animated,
   ActivityIndicator,
   Alert,
-  StyleSheet,
-  FlatList,
   Image,
 } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import { paymentService } from '../services/paymentService';
-import { theme } from '../styles/theme';
+    <View style={{ flex: 1 }}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Subscription Plans</Text>
+      </View>
 
-interface PaymentPlan {
+      <View style={styles.carouselWrap}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.carousel}
+        >
+          {plans.map((plan) => (
+            <Animated.View
+              key={plan.id}
+              style={[
+                styles.planCard,
+                selectedPlan === plan.id && styles.planCardSelected,
+                { transform: [{ scale: scaleMap.current[plan.id] || new Animated.Value(1) }] },
+              ]}
+            >
+              <Text style={[styles.planName, selectedPlan === plan.id && styles.planNameSelected]}>{plan.name}</Text>
+              <Text style={[styles.planPrice, selectedPlan === plan.id && styles.planPriceSelected]}>₹{plan.amount} / {plan.period}</Text>
+
+              <View style={styles.featuresList}>
+                {plan.features.map((f, idx) => (
+                  <View key={idx} style={styles.featureRow}>
+                    <MaterialIcons name="check-circle" size={16} color={selectedPlan === plan.id ? '#fff' : theme.colors.primary} />
+                    <Text style={[styles.featureText, selectedPlan === plan.id && { color: '#fff' }]}>{f}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={[styles.selectButton, selectedPlan === plan.id && styles.selectButtonSelected]}
+                onPress={() => handleSelectPlan(plan.id)}
+                activeOpacity={0.9}
+              >
+                <Text style={[styles.selectButtonText, selectedPlan === plan.id && styles.selectButtonTextSelected]}>
+                  {selectedPlan === plan.id ? 'Selected' : 'Choose Plan'}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+        </ScrollView>
+      </View>
+
+      <View style={styles.paymentFooter}>
+        <TouchableOpacity style={styles.payNowButton} onPress={handlePayment} disabled={processingPayment}>
+          {processingPayment ? <ActivityIndicator color="#fff" /> : <Text style={styles.payNowText}>Pay ₹{plans.find(p => p.id === selectedPlan)?.amount || 0}</Text>}
+        </TouchableOpacity>
+      </View>
+    </View>
+
+// Types
+
+type PaymentPlan = {
   id: string;
   name: string;
   amount: number;
   period: string;
   features: string[];
   savings?: string;
-}
+};
 
-interface PaymentHistoryItem {
+type PaymentHistoryItem = {
   id: string;
   amount: number;
-  currency: string;
   status: string;
   created_at: string;
   razorpay_payment_id: string;
-}
+};
 
 const PaymentScreen: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
@@ -47,10 +98,10 @@ const PaymentScreen: React.FC = () => {
       amount: 199,
       period: 'month',
       features: [
-        '✓ Unlimited questions',
-        '✓ Unlimited quizzes',
-        '✓ Unlimited flashcards',
-        '✓ Advanced AI features',
+        'Unlimited questions',
+        'Unlimited quizzes',
+        'Unlimited flashcards',
+        'Advanced AI features',
       ],
     },
     {
@@ -59,15 +110,26 @@ const PaymentScreen: React.FC = () => {
       amount: 1990,
       period: 'year',
       features: [
-        '✓ Unlimited questions',
-        '✓ Unlimited quizzes',
-        '✓ Unlimited flashcards',
-        '✓ Advanced AI features',
-        '✓ Priority support',
+        'Unlimited questions',
+        'Unlimited quizzes',
+        'Unlimited flashcards',
+        'Advanced AI features',
+        'Priority support',
       ],
       savings: 'Save ₹398 (17% off)',
     },
   ];
+
+  // Prepare animated values for each plan card
+  const scaleMap = useRef<Record<string, Animated.Value>>({});
+  plans.forEach((p) => {
+    if (!scaleMap.current[p.id]) scaleMap.current[p.id] = new Animated.Value(1);
+  });
+
+  // Carousel ref & snap config
+  const carouselRef = useRef<FlatList<any> | null>(null);
+  const PLAN_CARD_WIDTH = 320;
+  const SNAP_INTERVAL = PLAN_CARD_WIDTH + theme.spacing.md;
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -131,6 +193,18 @@ const PaymentScreen: React.FC = () => {
     }
   };
 
+  const handleSelectPlan = (planId: string) => {
+    setSelectedPlan(planId);
+    // animate scales: enlarge selected, shrink others
+    Object.entries(scaleMap.current).forEach(([id, val]) => {
+      Animated.timing(val, {
+        toValue: id === planId ? 1.04 : 1,
+        duration: 250,
+        useNativeDriver: false,
+      }).start();
+    });
+  };
+
   const handleRefund = async (paymentId: string) => {
     Alert.alert(
       'Request Refund',
@@ -166,7 +240,7 @@ const PaymentScreen: React.FC = () => {
     <View key={plan.id} style={[styles.planCard, selectedPlan === plan.id && styles.planCardSelected]}>
       <TouchableOpacity
         style={styles.planCardContent}
-        onPress={() => setSelectedPlan(plan.id)}
+        onPress={() => handleSelectPlan(plan.id)}
       >
         {/* Plan Name */}
         <Text style={styles.planName}>{plan.name}</Text>
@@ -180,8 +254,11 @@ const PaymentScreen: React.FC = () => {
 
         {/* Price */}
         <View style={styles.priceSection}>
-          <Text style={styles.amount}>₹{plan.amount}</Text>
-          <Text style={styles.period}>per {plan.period}</Text>
+          <View style={styles.priceRow}>
+            <Text style={[styles.amount, selectedPlan === plan.id && styles.amountSelected]}>₹{plan.amount}</Text>
+            <Image source={require('../../assets/coins.png')} style={styles.priceCoin} resizeMode="contain" />
+          </View>
+          <Text style={[styles.period, selectedPlan === plan.id && styles.periodSelected]}>per {plan.period}</Text>
         </View>
 
         {/* Features List */}
@@ -277,7 +354,39 @@ const PaymentScreen: React.FC = () => {
       {activeTab === 'plans' ? (
         <ScrollView style={styles.plansContainer} showsVerticalScrollIndicator={false}>
           {/* Plans List */}
-          {plans.map(renderPlanCard)}
+          <View>
+            <FlatList
+              ref={carouselRef}
+              data={plans}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.id}
+              snapToInterval={SNAP_INTERVAL}
+              decelerationRate="fast"
+              contentContainerStyle={{ paddingHorizontal: theme.spacing.lg }}
+              renderItem={({ item }) => {
+                const scaleVal = scaleMap.current[item.id] || new Animated.Value(1);
+                const translateY = scaleVal.interpolate({ inputRange: [1, 1.04], outputRange: [0, -8] });
+
+                return (
+                  <Animated.View
+                    style={{
+                      transform: [{ scale: scaleVal }, { translateY }],
+                      borderRadius: 20,
+                      overflow: 'hidden',
+                      marginRight: theme.spacing.md,
+                    }}
+                  >
+                    {renderPlanCard(item)}
+                  </Animated.View>
+                );
+              }}
+            <View style={styles.dotsContainer}>
+              {plans.map((p) => (
+                <View key={p.id} style={[styles.dot, selectedPlan === p.id && styles.dotActive]} />
+              ))}
+            </View>
+          </View>
 
           {/* Payment Button */}
           <TouchableOpacity
@@ -530,6 +639,128 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.textSecondary,
     lineHeight: 20,
+  },
+
+  /* Carousel / plans styles */
+  carouselWrap: {
+    paddingVertical: theme.spacing.lg,
+  },
+  carousel: {
+    paddingHorizontal: theme.spacing.lg,
+    alignItems: 'center',
+  },
+
+  dotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: theme.spacing.sm,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.border,
+    marginHorizontal: theme.spacing.xs,
+  },
+  dotActive: {
+    backgroundColor: theme.colors.primary,
+    width: 14,
+  },
+  planCard: {
+    width: 320,
+    minHeight: 220,
+    backgroundColor: theme.colors.white,
+    borderRadius: 20,
+    padding: theme.spacing.lg,
+    marginRight: theme.spacing.md,
+    overflow: 'hidden',
+    ...theme.shadows.sm,
+  },
+  planCardSelected: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+    ...theme.shadows.lg,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  priceCoin: {
+    width: 26,
+    height: 26,
+    marginLeft: theme.spacing.sm,
+  },
+  amountSelected: {
+    color: '#fff',
+  },
+  periodSelected: {
+    color: '#fff',
+  },
+  planName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  planNameSelected: {
+    color: '#fff',
+  },
+  planPrice: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginTop: theme.spacing.xs,
+  },
+  planPriceSelected: {
+    color: '#fff',
+  },
+  featuresList: {
+    marginTop: theme.spacing.md,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
+  },
+  featureText: {
+    color: theme.colors.text,
+    fontSize: 13,
+  },
+  selectButton: {
+    marginTop: theme.spacing.md,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.full,
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  selectButtonSelected: {
+    backgroundColor: '#fff0',
+    borderColor: '#fff',
+  },
+  selectButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  selectButtonTextSelected: {
+    color: '#fff',
+  },
+  paymentFooter: {
+    padding: theme.spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: theme.colors.white,
+  },
+  payNowButton: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+  },
+  payNowText: {
+    color: '#fff',
+    fontWeight: '700',
   },
 
   securityBox: {

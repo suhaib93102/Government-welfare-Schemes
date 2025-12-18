@@ -284,3 +284,185 @@ class QuizSummary(models.Model):
     
     def __str__(self):
         return f"Summary: {self.quiz.title} - Best: {self.best_score}%"
+
+
+class UserCoins(models.Model):
+    """Track user coins earned from Daily Quizzes and other activities"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_id = models.CharField(max_length=255, unique=True, db_index=True)
+    total_coins = models.IntegerField(default=0)
+    lifetime_coins = models.IntegerField(default=0)  # Total ever earned
+    coins_spent = models.IntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-total_coins']
+        verbose_name_plural = "User Coins"
+    
+    def __str__(self):
+        return f"{self.user_id} - {self.total_coins} coins"
+    
+    def add_coins(self, amount, reason=""):
+        """Add coins to user account"""
+        self.total_coins += amount
+        self.lifetime_coins += amount
+        self.save()
+        
+        # Log the transaction
+        CoinTransaction.objects.create(
+            user_coins=self,
+            amount=amount,
+            transaction_type='earn',
+            reason=reason
+        )
+    
+    def spend_coins(self, amount, reason=""):
+        """Spend coins from user account"""
+        if self.total_coins >= amount:
+            self.total_coins -= amount
+            self.coins_spent += amount
+            self.save()
+            
+            # Log the transaction
+            CoinTransaction.objects.create(
+                user_coins=self,
+                amount=amount,
+                transaction_type='spend',
+                reason=reason
+            )
+            return True
+        return False
+
+
+class CoinTransaction(models.Model):
+    """Log all coin transactions"""
+    TRANSACTION_TYPES = [
+        ('earn', 'Earned'),
+        ('spend', 'Spent'),
+        ('bonus', 'Bonus'),
+        ('refund', 'Refund'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_coins = models.ForeignKey(UserCoins, on_delete=models.CASCADE, related_name='transactions')
+    amount = models.IntegerField()
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
+    reason = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.user_coins.user_id} - {self.transaction_type} {self.amount} coins"
+
+
+class DailyQuiz(models.Model):
+    """Daily GK quiz - one per day"""
+    DIFFICULTY_CHOICES = [
+        ('easy', 'Easy'),
+        ('moderate', 'Moderate'),
+        ('mixed', 'Mixed'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    date = models.DateField(unique=True, db_index=True)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='mixed')
+    total_questions = models.IntegerField(default=10)
+    coins_per_correct = models.IntegerField(default=5)
+    is_active = models.BooleanField(default=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-date']
+        verbose_name_plural = "Daily Quizzes"
+    
+    def __str__(self):
+        return f"Daily Quiz - {self.date} ({self.total_questions} questions)"
+    
+    @property
+    def max_coins(self):
+        """Maximum coins that can be earned from this quiz"""
+        return self.total_questions * self.coins_per_correct
+
+
+class DailyQuestion(models.Model):
+    """Individual questions for Daily Quiz"""
+    DIFFICULTY_CHOICES = [
+        ('easy', 'Easy'),
+        ('moderate', 'Moderate'),
+    ]
+    
+    CATEGORY_CHOICES = [
+        ('general', 'General Knowledge'),
+        ('current_events', 'Current Events'),
+        ('science', 'Science'),
+        ('history', 'History'),
+        ('geography', 'Geography'),
+        ('sports', 'Sports'),
+        ('entertainment', 'Entertainment'),
+        ('technology', 'Technology'),
+        ('politics', 'Politics'),
+        ('economics', 'Economics'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    daily_quiz = models.ForeignKey(DailyQuiz, on_delete=models.CASCADE, related_name='questions')
+    order = models.IntegerField()
+    
+    question_text = models.TextField()
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='general')
+    difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='easy')
+    
+    # MCQ options (stored as JSON)
+    options = models.JSONField(default=list)  # [{"id": "A", "text": "..."}, {"id": "B", "text": "..."}, ...]
+    correct_answer = models.CharField(max_length=10)  # "A", "B", "C", or "D"
+    
+    explanation = models.TextField(blank=True)
+    fun_fact = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['daily_quiz', 'order']
+        unique_together = ['daily_quiz', 'order']
+    
+    def __str__(self):
+        return f"Q{self.order}: {self.question_text[:50]}..."
+
+
+class UserDailyQuizAttempt(models.Model):
+    """Track user attempts on Daily Quizzes"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    daily_quiz = models.ForeignKey(DailyQuiz, on_delete=models.CASCADE, related_name='attempts')
+    user_id = models.CharField(max_length=255, db_index=True)
+    
+    # Results
+    answers = models.JSONField(default=dict)  # {question_id: "A", ...}
+    correct_count = models.IntegerField(default=0)
+    total_questions = models.IntegerField(default=10)
+    score_percentage = models.FloatField(default=0.0)
+    
+    # Coins
+    coins_earned = models.IntegerField(default=0)
+    
+    # Timing
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    time_taken_seconds = models.IntegerField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-started_at']
+        unique_together = ['daily_quiz', 'user_id']  # One attempt per user per day
+        indexes = [
+            models.Index(fields=['user_id', '-started_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user_id} - {self.daily_quiz.date} - {self.correct_count}/{self.total_questions} ({self.coins_earned} coins)"

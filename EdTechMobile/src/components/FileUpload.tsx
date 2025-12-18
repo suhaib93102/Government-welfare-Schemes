@@ -161,8 +161,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           >
             {loading ? (
               <>
-                <ActivityIndicator size="small" color={colors.white} />
-                <Text style={styles.submitButtonText}>Processing...</Text>
+                <AnimatedLoader visible={true} size="small" color={colors.white} />
+                <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>Processing...</Text>
               </>
             ) : (
               <>

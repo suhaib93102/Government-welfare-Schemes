@@ -49,4 +49,5 @@ const styles = StyleSheet.create({
   },
 });
 
+export { Loader };
 export default Loader;
