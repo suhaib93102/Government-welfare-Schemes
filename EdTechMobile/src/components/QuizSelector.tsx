@@ -23,6 +23,7 @@ interface QuizSelectorProps {
   userCoins?: number;
   isPremium?: boolean;
   dailyQuizCount?: number;
+  quizType?: 'regular' | 'mock-test';
 }
 
 interface QuizConfig {
@@ -53,9 +54,10 @@ export const QuizSelector: React.FC<QuizSelectorProps> = ({
   onClose, 
   userCoins = 1250,
   isPremium = false,
-  dailyQuizCount = 0
+  dailyQuizCount = 0,
+  quizType = 'regular'
 }) => {
-  const [selectedSubject, setSelectedSubject] = useState<string>('mathematics');
+  const [selectedSubject, setSelectedSubject] = useState<string>('maths');
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('medium');
   const [selectedExamLevel, setSelectedExamLevel] = useState<string>('jee-mains');
@@ -73,8 +75,8 @@ export const QuizSelector: React.FC<QuizSelectorProps> = ({
 
   const subjects: Subject[] = [
     {
-      id: 'mathematics',
-      name: 'Mathematics',
+      id: 'maths',
+      name: 'Maths',
       icon: require('../../assets/maths.png'),
       color: '#3B82F6',
       bgColor: '#EFF6FF',
@@ -115,49 +117,49 @@ export const QuizSelector: React.FC<QuizSelectorProps> = ({
 
   const topicsByExamAndSubject: { [key: string]: { [key: string]: string[] } } = {
     'jee-mains': {
-      mathematics: ['Algebra', 'Calculus', 'Coordinate Geometry', 'Trigonometry', 'Vectors', 'Probability', 'Complex Numbers', '3D Geometry', 'Matrices', 'Differential Equations'],
+      maths: ['Algebra', 'Calculus', 'Coordinate Geometry', 'Trigonometry', 'Vectors', 'Probability', 'Complex Numbers', '3D Geometry', 'Matrices', 'Differential Equations'],
       physics: ['Mechanics', 'Thermodynamics', 'Electromagnetism', 'Optics', 'Modern Physics', 'Waves', 'Current Electricity', 'Rotational Motion', 'SHM', 'Ray Optics'],
       chemistry: ['Physical Chemistry', 'Organic Chemistry', 'Inorganic Chemistry', 'Chemical Bonding', 'Thermodynamics', 'Electrochemistry', 'Solutions', 'Chemical Kinetics', 'Equilibrium', 'Atomic Structure'],
       biology: ['Genetics', 'Ecology', 'Cell Biology', 'Evolution', 'Biotechnology', 'Human Physiology', 'Plant Physiology', 'Molecular Biology', 'Diversity', 'Reproduction'],
     },
     'jee-advanced': {
-      mathematics: ['Complex Numbers', 'Calculus', 'Vectors & 3D Geometry', 'Matrices & Determinants', 'Differential Equations', 'Probability', 'Quadratic Equations', 'Sequences & Series', 'Conic Sections', 'Functions'],
+      maths: ['Complex Numbers', 'Calculus', 'Vectors & 3D Geometry', 'Matrices & Determinants', 'Differential Equations', 'Probability', 'Quadratic Equations', 'Sequences & Series', 'Conic Sections', 'Functions'],
       physics: ['Modern Physics', 'Electrodynamics', 'Mechanics', 'Thermodynamics', 'Optics', 'Waves', 'Magnetism', 'Quantum Physics', 'Nuclear Physics', 'Semiconductors'],
       chemistry: ['Organic Chemistry', 'Physical Chemistry', 'Inorganic Chemistry', 'Coordination Compounds', 'Chemical Bonding', 'Thermodynamics', 'Electrochemistry', 'Solutions', 'Transition Elements', 'GOC'],
       biology: ['Genetics', 'Molecular Biology', 'Biotechnology', 'Evolution', 'Ecology', 'Cell Biology', 'Human Physiology', 'Plant Physiology', 'Immunology', 'Biomolecules'],
     },
     'neet': {
-      mathematics: [], // NEET doesn't have math
+      maths: [], // NEET doesn't have math
       physics: ['Mechanics', 'Thermodynamics', 'Electrostatics', 'Current Electricity', 'Magnetism', 'Optics', 'Modern Physics', 'Waves', 'SHM', 'Ray Optics'],
       chemistry: ['Organic Chemistry', 'Inorganic Chemistry', 'Physical Chemistry', 'Coordination Chemistry', 'Environmental Chemistry', 'Biomolecules', 'Polymers', 'Chemistry in Everyday Life', 'Surface Chemistry', 'Solid State'],
       biology: ['Human Physiology', 'Plant Physiology', 'Genetics', 'Molecular Biology', 'Ecology', 'Biotechnology', 'Evolution', 'Cell Biology', 'Reproduction', 'Health & Diseases'],
     },
     'class-10': {
-      mathematics: ['Real Numbers', 'Polynomials', 'Linear Equations', 'Quadratic Equations', 'Arithmetic Progressions', 'Triangles', 'Coordinate Geometry', 'Trigonometry', 'Circles', 'Statistics & Probability'],
+      maths: ['Real Numbers', 'Polynomials', 'Linear Equations', 'Quadratic Equations', 'Arithmetic Progressions', 'Triangles', 'Coordinate Geometry', 'Trigonometry', 'Circles', 'Statistics & Probability'],
       physics: ['Light', 'Electricity', 'Magnetic Effects', 'Energy Sources', 'Human Eye', 'Reflection & Refraction', 'Electric Current', 'Circuits', 'Magnets', 'Energy'],
       chemistry: ['Chemical Reactions', 'Acids & Bases', 'Metals & Non-metals', 'Carbon Compounds', 'Periodic Classification', 'Chemical Equations', 'Redox Reactions', 'Ionic Compounds', 'Salts', 'pH Scale'],
       biology: ['Life Processes', 'Control & Coordination', 'Reproduction', 'Heredity & Evolution', 'Respiration', 'Transportation', 'Excretion', 'Nervous System', 'Hormones', 'Genetics'],
     },
     'class-12': {
-      mathematics: ['Relations & Functions', 'Inverse Trigonometry', 'Matrices', 'Determinants', 'Continuity & Differentiability', 'Integrals', 'Applications of Integrals', 'Differential Equations', 'Vectors', '3D Geometry'],
+      maths: ['Relations & Functions', 'Inverse Trigonometry', 'Matrices', 'Determinants', 'Continuity & Differentiability', 'Integrals', 'Applications of Integrals', 'Differential Equations', 'Vectors', '3D Geometry'],
       physics: ['Electrostatics', 'Current Electricity', 'Magnetism', 'Electromagnetic Induction', 'Alternating Current', 'Optics', 'Dual Nature', 'Atoms & Nuclei', 'Semiconductors', 'Communication Systems'],
       chemistry: ['Solid State', 'Solutions', 'Electrochemistry', 'Chemical Kinetics', 'Surface Chemistry', 'd & f Block', 'Coordination Compounds', 'Haloalkanes', 'Alcohols & Phenols', 'Aldehydes & Ketones'],
       biology: ['Reproduction', 'Genetics', 'Evolution', 'Human Health', 'Food Production', 'Microbes', 'Biotechnology', 'Organisms & Populations', 'Ecosystem', 'Biodiversity'],
     },
     'gate': {
-      mathematics: ['Linear Algebra', 'Calculus', 'Differential Equations', 'Probability', 'Statistics', 'Numerical Methods', 'Discrete Mathematics', 'Graph Theory', 'Combinatorics', 'Complex Analysis'],
+      maths: ['Linear Algebra', 'Calculus', 'Differential Equations', 'Probability', 'Statistics', 'Numerical Methods', 'Discrete Mathematics', 'Graph Theory', 'Combinatorics', 'Complex Analysis'],
       physics: ['Mechanics', 'Thermodynamics', 'Electromagnetism', 'Quantum Mechanics', 'Optics', 'Statistical Mechanics', 'Solid State Physics', 'Nuclear Physics', 'Electronics', 'Waves'],
       chemistry: ['Physical Chemistry', 'Organic Chemistry', 'Inorganic Chemistry', 'Analytical Chemistry', 'Spectroscopy', 'Thermodynamics', 'Quantum Chemistry', 'Electrochemistry', 'Kinetics', 'Catalysis'],
       biology: ['Molecular Biology', 'Biochemistry', 'Cell Biology', 'Genetics', 'Microbiology', 'Immunology', 'Biotechnology', 'Plant Science', 'Animal Science', 'Ecology'],
     },
     'cat': {
-      mathematics: ['Number Systems', 'Algebra', 'Geometry', 'Mensuration', 'Trigonometry', 'Arithmetic', 'Data Interpretation', 'Percentages', 'Profit & Loss', 'Time & Work'],
+      maths: ['Number Systems', 'Algebra', 'Geometry', 'Mensuration', 'Trigonometry', 'Arithmetic', 'Data Interpretation', 'Percentages', 'Profit & Loss', 'Time & Work'],
       physics: [], // CAT doesn't typically have physics
       chemistry: [], // CAT doesn't typically have chemistry
       biology: [], // CAT doesn't typically have biology
     },
     'other': {
-      mathematics: ['Algebra', 'Calculus', 'Geometry', 'Trigonometry', 'Statistics', 'Probability', 'Number Theory', 'Matrices', 'Vectors', 'Differential Equations'],
+      maths: ['Algebra', 'Calculus', 'Geometry', 'Trigonometry', 'Statistics', 'Probability', 'Number Theory', 'Matrices', 'Vectors', 'Differential Equations'],
       physics: ['Mechanics', 'Thermodynamics', 'Electromagnetism', 'Optics', 'Modern Physics', 'Waves', 'Kinematics', 'Dynamics', 'Energy', 'Oscillations'],
       chemistry: ['Organic Chemistry', 'Inorganic Chemistry', 'Physical Chemistry', 'Chemical Bonding', 'Thermodynamics', 'Electrochemistry', 'Solutions', 'Kinetics', 'Equilibrium', 'Acids & Bases'],
       biology: ['Cell Biology', 'Genetics', 'Evolution', 'Ecology', 'Human Physiology', 'Plant Physiology', 'Molecular Biology', 'Biotechnology', 'Microbiology', 'Biochemistry'],
@@ -200,6 +202,10 @@ export const QuizSelector: React.FC<QuizSelectorProps> = ({
     // Free users can only take 1 quiz per day
     if (!isPremium && dailyQuizCount >= 1) {
       return false;
+    }
+    // For mock tests, no need to select topics
+    if (quizType === 'mock-test') {
+      return true;
     }
     return selectedTopics.length > 0;
   };
@@ -354,42 +360,44 @@ export const QuizSelector: React.FC<QuizSelectorProps> = ({
               </View>
 
               {/* Topics - Checkbox Grid */}
-              <View style={styles.configItem}>
-                <Text style={styles.configLabel}>Select Topics (PYQ)</Text>
-                {getTopicsForCurrentSelection().length === 0 ? (
-                  <View style={styles.noTopicsContainer}>
-                    <MaterialIcons name="info-outline" size={24} color={colors.textMuted} />
-                    <Text style={styles.noTopicsText}>
-                      No topics available for {selectedSubject} in {examLevels.find(e => e.id === selectedExamLevel)?.name}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={[styles.topicsGrid, !isTablet && styles.topicsGridMobile]}>
-                    {getTopicsForCurrentSelection().map((topic, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={[
-                          styles.topicCheckbox,
-                          selectedTopics.includes(topic) && styles.topicCheckboxSelected,
-                        ]}
-                        onPress={() => toggleTopic(topic)}
-                      >
-                        <MaterialIcons 
-                          name={selectedTopics.includes(topic) ? 'check-box' : 'check-box-outline-blank'} 
-                          size={20} 
-                          color={selectedTopics.includes(topic) ? colors.primary : colors.textMuted} 
-                        />
-                        <Text style={[
-                          styles.topicCheckboxText,
-                          selectedTopics.includes(topic) && styles.topicCheckboxTextSelected,
-                        ]}>
-                          {topic}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
+              {quizType !== 'mock-test' && (
+                <View style={styles.configItem}>
+                  <Text style={styles.configLabel}>Select Topics (PYQ)</Text>
+                  {getTopicsForCurrentSelection().length === 0 ? (
+                    <View style={styles.noTopicsContainer}>
+                      <MaterialIcons name="info-outline" size={24} color={colors.textMuted} />
+                      <Text style={styles.noTopicsText}>
+                        No topics available for {selectedSubject} in {examLevels.find(e => e.id === selectedExamLevel)?.name}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.topicsGrid, !isTablet && styles.topicsGridMobile]}>
+                      {getTopicsForCurrentSelection().map((topic, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={[
+                            styles.topicCheckbox,
+                            selectedTopics.includes(topic) && styles.topicCheckboxSelected,
+                          ]}
+                          onPress={() => toggleTopic(topic)}
+                        >
+                          <MaterialIcons 
+                            name={selectedTopics.includes(topic) ? 'check-box' : 'check-box-outline-blank'} 
+                            size={20} 
+                            color={selectedTopics.includes(topic) ? colors.primary : colors.textMuted} 
+                          />
+                          <Text style={[
+                            styles.topicCheckboxText,
+                            selectedTopics.includes(topic) && styles.topicCheckboxTextSelected,
+                          ]}>
+                            {topic}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
 
               {/* Difficulty Level & Number of Questions */}
               <View style={[styles.configRow, !isTablet && styles.configRowMobile]}>

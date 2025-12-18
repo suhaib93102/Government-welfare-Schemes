@@ -322,6 +322,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
+    backgroundColor: 'transparent',
+    minHeight: 400,
   },
   loadingText: {
     ...typography.body,

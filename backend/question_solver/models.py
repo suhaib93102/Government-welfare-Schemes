@@ -466,3 +466,27 @@ class UserDailyQuizAttempt(models.Model):
     
     def __str__(self):
         return f"{self.user_id} - {self.daily_quiz.date} - {self.correct_count}/{self.total_questions} ({self.coins_earned} coins)"
+
+class PasswordResetToken(models.Model):
+    """Store password reset tokens for email-based reset"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField('auth.User', on_delete=models.CASCADE, related_name='password_reset_token')
+    token = models.CharField(max_length=255, unique=True)  # URL-safe token
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()  # Token expires after 24 hours
+    is_used = models.BooleanField(default=False)  # One-time use token
+    used_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['token']),
+            models.Index(fields=['user', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"Reset token for {self.user.email}"
+    
+    def is_valid(self):
+        """Check if token is still valid (not expired and not used)"""
+        return not self.is_used and timezone.now() < self.expires_at

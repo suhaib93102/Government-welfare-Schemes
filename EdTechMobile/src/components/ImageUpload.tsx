@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -21,11 +22,14 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ onSubmit, loading }) =
   const [imageUri, setImageUri] = useState<string | null>(null);
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please grant camera roll permissions');
-      return;
+    // Request permissions only on mobile platforms
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Please grant camera roll permissions');
+        return;
+      }
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -40,11 +44,14 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ onSubmit, loading }) =
   };
 
   const takePicture = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please grant camera permissions');
-      return;
+    // Request permissions only on mobile platforms
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Please grant camera permissions');
+        return;
+      }
     }
 
     const result = await ImagePicker.launchCameraAsync({

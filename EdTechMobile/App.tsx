@@ -36,6 +36,7 @@ import { TrendAnalysis } from './src/components/TrendAnalysis';
 import { getUserCoins } from './src/services/api';
 import { DailyQuizScreen } from './src/components/DailyQuizScreen';
 import { solveQuestionByText, solveQuestionByImage, checkHealth, generateQuiz, generateFlashcards, generateStudyMaterial, summarizeYouTubeVideo, generatePredictedQuestions } from './src/services/api';
+import { generateMockTest } from './src/services/mockTestService';
 import { colors, spacing, borderRadius, typography, shadows } from './src/styles/theme';
 
 type TabType = 'text' | 'image';
@@ -63,11 +64,10 @@ const isWeb = Platform.OS === 'web';
   { id: 'flashcards' as PageType, label: 'Flashcards', icon: 'style' },
   { id: 'ask' as PageType, label: 'Ask Question', icon: 'help' },
   { id: 'predicted-questions' as PageType, label: 'Predicted Questions', icon: 'psychology' },
-  { id: 'trends' as PageType, label: 'Trends', icon: 'analytics' },
+  { id: 'trends' as PageType, label: 'PYQ Features', icon: 'analytics' },
   { id: 'daily-quiz' as PageType, label: 'Daily Quiz', icon: 'emoji-events' },
   { id: 'youtube-summarizer' as PageType, label: 'YouTube Summarizer', icon: 'ondemand-video' },
   { id: 'pricing' as PageType, label: 'Pricing', icon: 'local-offer' },
-  { id: 'profile' as PageType, label: 'Profile', icon: 'account-circle' },
 ];
 
 export default function App() {
@@ -463,21 +463,29 @@ export default function App() {
   };
 
   const handleStartQuiz = (config: any) => {
-    // Build a descriptive topic string from subject + selected topics to satisfy backend minimum length
-    const topicsText = (config.topics && config.topics.length > 0) ? config.topics.join(', ') : '';
-    let topic = `${config.subject}${topicsText ? ': ' + topicsText : ''}`;
+    try {
+      setQuizLoading(true);
+      setQuizData(null);
 
-    // If still short, add a short prompt to reach minimum length required by backend
-    if (topic.trim().length < 50) {
-      topic = `${topic} - Generate ${config.numQuestions} ${config.difficulty} level questions covering ${topicsText || config.subject} with sample answers and explanations.`;
+      // Generate mock test from local JSON files with random question selection
+      const mockTestData = generateMockTest({
+        subject: config.subject,
+        topics: config.topics || [],
+        difficulty: config.difficulty || 'medium',
+        examLevel: config.examLevel || 'jee-mains',
+        timeLimit: config.timeLimit || 0,
+        numQuestions: config.numQuestions || 20,
+      });
+
+      setQuizData(mockTestData);
+      setQuizLoading(false);
+      
+      // Increment Daily Quiz count for free users
+      setDailyQuizCount(prev => prev + 1);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to generate mock test');
+      setQuizLoading(false);
     }
-
-    const numQuestions = config.numQuestions;
-    const difficulty = config.difficulty;
-
-    handleGenerateQuiz(topic, numQuestions, difficulty);
-    // Increment Daily Quiz count for free users
-    setDailyQuizCount(prev => prev + 1);
   };
 
   const renderSidebar = () => {
@@ -769,6 +777,7 @@ export default function App() {
                   userCoins={0}
                   isPremium={false}
                   dailyQuizCount={dailyQuizCount}
+                  quizType="mock-test"
                 />
               )}
               {(quizData || quizLoading) && (
@@ -1081,32 +1090,6 @@ export default function App() {
         <View style={{ flex: 1, padding: spacing.lg }}>
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             <TrendAnalysis onClose={() => setCurrentPage('ask')} />
-          </ScrollView>
-        </View>
-      ) : currentPage === 'profile' ? (
-        <View style={{ flex: 1, padding: spacing.lg }}>
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-            <View style={styles.profileContainer}>
-              <View style={styles.profileHeader}>
-                <MaterialIcons name="account-circle" size={100} color={colors.primary} />
-                <Text style={styles.profileName}>Student User</Text>
-                <Text style={styles.profileRole}>Learner</Text>
-              </View>
-              <View style={styles.profileStats}>
-                <View style={styles.profileStatCard}>
-                  <Text style={styles.profileStatValue}>24</Text>
-                  <Text style={styles.profileStatLabel}>Quizzes Taken</Text>
-                </View>
-                <View style={styles.profileStatCard}>
-                  <Text style={styles.profileStatValue}>156</Text>
-                  <Text style={styles.profileStatLabel}>Flashcards Studied</Text>
-                </View>
-                <View style={styles.profileStatCard}>
-                  <Text style={styles.profileStatValue}>89%</Text>
-                  <Text style={styles.profileStatLabel}>Avg Score</Text>
-                </View>
-              </View>
-            </View>
           </ScrollView>
         </View>
       ) : null}
@@ -1558,6 +1541,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.lg,
+    backgroundColor: 'transparent',
+    minHeight: 400,
   },
   loadingText: {
     ...typography.body,

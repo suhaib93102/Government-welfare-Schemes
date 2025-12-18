@@ -33,7 +33,10 @@ from .simple_auth_views import (
     RegisterView,
     LoginView,
     VerifyTokenView,
-    ChangePasswordView
+    ChangePasswordView,
+    RequestPasswordResetView,
+    ValidateResetTokenView,
+    ResetPasswordView
 )
 from .payment_views import (
     CreatePaymentOrderView,
@@ -82,6 +85,9 @@ urlpatterns = [
     path('auth/login/', LoginView.as_view(), name='login'),
     path('auth/verify/', VerifyTokenView.as_view(), name='verify-token'),
     path('auth/change-password/', ChangePasswordView.as_view(), name='change-password'),
+    path('auth/request-password-reset/', RequestPasswordResetView.as_view(), name='request-password-reset'),
+    path('auth/validate-reset-token/', ValidateResetTokenView.as_view(), name='validate-reset-token'),
+    path('auth/reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     
     # Payment endpoints (Razorpay)
     path('payment/create-order/', CreatePaymentOrderView.as_view(), name='create-payment-order'),

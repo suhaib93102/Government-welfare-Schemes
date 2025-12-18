@@ -1,7 +1,25 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  Animated,
+  Platform,
+  Dimensions,
+} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
+import { colors, spacing, borderRadius } from '../styles/theme';
+
+const { width } = Dimensions.get('window');
+const isWeb = Platform.OS === 'web';
+
+interface Feature {
+  name: string;
+  included: boolean;
+}
 
 interface PricingPlan {
   id: string;
@@ -9,294 +27,386 @@ interface PricingPlan {
   price: string;
   period: string;
   description: string;
-  features: Array<{
-    name: string;
-    included: boolean;
-    limit?: string;
-  }>;
+  features: Feature[];
   highlighted: boolean;
   buttonText: string;
-  ctaText?: string;
+  badge?: string;
+}
+
+interface ComparisonRow {
+  feature: string;
+  free: string;
+  scholar: string;
+  genius: string;
 }
 
 export const Pricing: React.FC = () => {
-  const [selectedPlan, setSelectedPlan] = useState<string>('free');
-  const [autoPayEnabled, setAutoPayEnabled] = useState(false);
+  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<string>('scholar');
+  const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
+
+  const isLarge = isWeb && width >= 900;
 
   const plans: PricingPlan[] = [
     {
       id: 'free',
       name: 'Free',
-      price: '₹0',
-      period: '/month',
-      description: 'Perfect for getting started',
+      price: '$0',
+      period: '/mo',
+      description: 'For casual learners',
       highlighted: false,
-      buttonText: 'Current Plan',
+      buttonText: 'Start for Free',
       features: [
-        { name: 'Ask Question (Image/Text)', included: true, limit: '3 per month' },
-        { name: 'Generate Quiz', included: true, limit: '3 per month' },
-        { name: 'Create Flashcards', included: true, limit: '3 per month' },
-        { name: 'YouTube Summarizer', included: false },
-        { name: 'Predicted Questions', included: false },
-        { name: 'Trends Analysis', included: false },
-        { name: 'Study Material', included: false },
-        { name: 'Priority Support', included: false },
+        { name: '5 document uploads/mo', included: true },
+        { name: 'Basic AI model (GPT-3.5)', included: true },
+        { name: 'Standard flashcards', included: true },
+        { name: 'Export to Anki', included: false },
       ],
     },
     {
-      id: 'premium',
-      name: 'Premium',
-      price: '₹1',
-      period: '/99 after month-end',
-      description: 'Unlock all features with auto-pay',
+      id: 'scholar',
+      name: 'Scholar',
+      price: '$8',
+      period: '/mo',
+      description: 'For serious students',
       highlighted: true,
-      buttonText: 'Get Premium',
-      ctaText: 'Auto-renews Monthly',
+      badge: 'MOST POPULAR',
+      buttonText: 'Get Scholar',
       features: [
-        { name: 'Ask Question (Image/Text)', included: true, limit: 'Unlimited' },
-        { name: 'Generate Quiz', included: true, limit: 'Unlimited' },
-        { name: 'Create Flashcards', included: true, limit: 'Unlimited' },
-        { name: 'YouTube Summarizer', included: true, limit: 'Unlimited' },
-        { name: 'Predicted Questions', included: true, limit: 'Unlimited' },
-        { name: 'Trends Analysis', included: true, limit: 'Unlimited' },
-        { name: 'Study Material', included: true, limit: 'Unlimited' },
-        { name: 'Priority Support', included: true },
+        { name: 'Unlimited uploads', included: true },
+        { name: 'Advanced AI (GPT-4)', included: true },
+        { name: 'Export to Anki & PDF', included: true },
+        { name: 'Ad-free experience', included: true },
+      ],
+    },
+    {
+      id: 'genius',
+      name: 'Genius',
+      price: '$15',
+      period: '/mo',
+      description: 'For power users & teams',
+      highlighted: false,
+      buttonText: 'Get Genius',
+      features: [
+        { name: 'AI Tutor Chat Mode', included: true },
+        { name: 'Handwriting recognition (OCR)', included: true },
+        { name: 'Team collaboration', included: true },
+        { name: 'Priority 24/7 Support', included: true },
       ],
     },
   ];
 
-  const handleSubscribe = (planId: string) => {
-    if (planId === 'free') {
-      Alert.alert('Info', 'You are already on the free plan');
-      return;
-    }
+  const comparisonData: ComparisonRow[] = [
+    { feature: 'Document Uploads', free: '5 / month', scholar: 'Unlimited', genius: 'Unlimited' },
+    { feature: 'AI Model Quality', free: 'Standard', scholar: 'Advanced (GPT-4)', genius: 'Advanced (GPT-4)' },
+    { feature: 'Flashcard Export', free: 'PDF only', scholar: 'Anki, CSV, PDF', genius: 'Anki, CSV, PDF' },
+    { feature: 'Study Modes', free: 'Quiz only', scholar: 'Quiz & Flashcards', genius: 'All Modes + Tutor' },
+    { feature: 'Max File Size', free: '10 MB', scholar: '50 MB', genius: '200 MB' },
+    { feature: 'Support', free: 'Community', scholar: 'Email', genius: '24/7 Priority' },
+  ];
 
-    if (planId === 'premium') {
-      setAutoPayEnabled(true);
-      Alert.alert(
-        'Premium Subscription',
-        `You will be charged ₹1.99 after the current month ends.\n\nAuto-pay will renew your subscription every month.`,
-        [
-          {
-            text: 'Cancel',
-            onPress: () => setAutoPayEnabled(false),
-            style: 'cancel',
-          },
-          {
-            text: 'Continue',
-            onPress: () => {
-              setSelectedPlan('premium');
-              Alert.alert('Success', 'Premium subscription activated! You will be charged ₹1.99 at month-end.');
-            },
-          },
-        ]
-      );
-    }
+  const faqData = [
+    {
+      question: 'How accurate is the AI quiz generation?',
+      answer: 'Our AI achieves over 95% accuracy in generating relevant questions from your study materials.',
+    },
+    {
+      question: 'Does it work with handwritten notes?',
+      answer: 'Yes! The Genius plan includes advanced OCR that can read and process handwritten notes.',
+    },
+    {
+      question: 'Can I cancel my subscription anytime?',
+      answer: 'Absolutely. You can cancel anytime with no cancellation fees.',
+    },
+    {
+      question: 'Is there a student discount?',
+      answer: 'Yes! We offer a 20% discount for verified students. Contact support with your student ID.',
+    },
+  ];
+
+  const animValues = useRef(
+    plans.reduce((acc, p) => {
+      acc[p.id] = new Animated.Value(1);
+      return acc;
+    }, {} as Record<string, Animated.Value>)
+  ).current;
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  const handleHoverIn = (id: string) => {
+    Animated.spring(animValues[id], {
+      toValue: 1.05,
+      friction: 5,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const handleManageAutopay = () => {
-    if (autoPayEnabled) {
-      Alert.alert(
-        'Manage Auto-Pay',
-        'Current Status: Enabled\n\nAuto-pay renews your subscription automatically every month.',
-        [
-          {
-            text: 'Keep Enabled',
-            style: 'cancel',
-          },
-          {
-            text: 'Disable Auto-Pay',
-            onPress: () => {
-              setAutoPayEnabled(false);
-              Alert.alert('Success', 'Auto-pay has been disabled. Your subscription will expire at month-end.');
-            },
-            style: 'destructive',
-          },
-        ]
-      );
-    } else {
-      Alert.alert(
-        'Auto-Pay Disabled',
-        'Enable auto-pay to automatically renew your subscription every month.',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Enable Auto-Pay',
-            onPress: () => {
-              setAutoPayEnabled(true);
-              Alert.alert('Success', 'Auto-pay has been enabled.');
-            },
-          },
-        ]
-      );
-    }
+  const handleHoverOut = (id: string) => {
+    Animated.spring(animValues[id], {
+      toValue: 1,
+      friction: 5,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleSubscribe = (planId: string) => {
+    Alert.alert('Subscription', `You selected the ${plans.find((p) => p.id === planId)?.name} plan!`);
   };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
-        <MaterialIcons name="local-offer" size={40} color={colors.primary} />
-        <Text style={styles.headerTitle}>Simple Pricing</Text>
-        <Text style={styles.headerSubtitle}>Choose the perfect plan for your learning journey</Text>
-      </View>
+      {/* Hero Section */}
+      <Animated.View style={[styles.hero, { opacity: fadeAnim }]}>
+        <Text style={styles.heroTitle}>Unlock your full learning potential</Text>
+        <Text style={styles.heroSubtitle}>
+          Turn your notes into quizzes instantly. Start generating AI quizzes and flashcards for free, or upgrade for unlimited power.
+        </Text>
+      </Animated.View>
 
       {/* Pricing Cards */}
-      <View style={styles.plansContainer}>
-        {plans.map((plan) => (
-          <View key={plan.id} style={[styles.planCard, plan.highlighted && styles.planCardHighlighted]}>
-            {plan.highlighted && (
-              <View style={styles.popularBadge}>
-                <MaterialIcons name="trending-up" size={16} color={colors.white} />
-                <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
-              </View>
-            )}
-
-            <View style={styles.planHeader}>
-              <Text style={styles.planName}>{plan.name}</Text>
-              <Text style={styles.planDescription}>{plan.description}</Text>
-            </View>
-
-            <View style={styles.priceSection}>
-              <Text style={styles.price}>{plan.price}</Text>
-              <Text style={styles.period}>{plan.period}</Text>
-            </View>
-
-            {plan.ctaText && (
-              <View style={styles.ctaBox}>
-                <MaterialIcons name="info" size={16} color={colors.primary} />
-                <Text style={styles.ctaText}>{plan.ctaText}</Text>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={[styles.subscribeButton, plan.highlighted && styles.subscribeButtonPremium]}
-              onPress={() => handleSubscribe(plan.id)}
-            >
-              <Text style={[styles.subscribeButtonText, plan.highlighted && styles.subscribeButtonTextPremium]}>
-                {plan.buttonText}
-              </Text>
-            </TouchableOpacity>
-
-            <View style={styles.featuresSection}>
-              <Text style={styles.featuresTitle}>Features:</Text>
-              {plan.features.map((feature, index) => (
-                <View key={index} style={styles.featureRow}>
-                  <MaterialIcons
-                    name={feature.included ? 'check-circle' : 'cancel'}
-                    size={20}
-                    color={feature.included ? colors.success : colors.textMuted}
-                  />
-                  <View style={styles.featureContent}>
-                    <Text style={[styles.featureName, !feature.included && styles.featureNameDisabled]}>
-                      {feature.name}
-                    </Text>
-                    {feature.limit && (
-                      <Text style={styles.featureLimit}>{feature.limit}</Text>
-                    )}
+      <View style={styles.cardsWrapper}>
+        {isLarge ? (
+          <View style={styles.cardsGrid}>
+            {plans.map((plan) => (
+              <Animated.View
+                key={plan.id}
+                style={(() => {
+                  const transforms: any[] = [{ scale: animValues[plan.id] }];
+                  if (plan.highlighted || selectedPlan === plan.id) transforms.push({ translateY: -6 });
+                  return [
+                    styles.card,
+                    (plan.highlighted || selectedPlan === plan.id) && styles.cardSelected,
+                    hoveredPlan === plan.id && !(selectedPlan === plan.id) && styles.cardHover,
+                    { transform: transforms, opacity: fadeAnim, cursor: isWeb ? 'pointer' : undefined },
+                  ];
+                })()}
+                onTouchStart={() => setSelectedPlan(plan.id)}
+                onMouseDown={() => isWeb && setSelectedPlan(plan.id)}
+                onMouseEnter={() => {
+                  if (isWeb) {
+                    setHoveredPlan(plan.id);
+                    handleHoverIn(plan.id);
+                  }
+                }}
+                onMouseLeave={() => {
+                  if (isWeb) {
+                    setHoveredPlan(null);
+                    handleHoverOut(plan.id);
+                  }
+                }}
+              >
+                {plan.badge && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{plan.badge}</Text>
                   </View>
+                )}
+
+                <View style={styles.cardHeader}>
+                  <Text style={styles.planName}>{plan.name}</Text>
+                  <Text style={styles.planDesc}>{plan.description}</Text>
                 </View>
-              ))}
-            </View>
+
+                <View style={styles.priceRow}>
+                  <Text style={styles.price}>{plan.price}</Text>
+                  <Text style={styles.period}>{plan.period}</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.cta,
+                    (plan.highlighted || selectedPlan === plan.id) && styles.ctaHighlighted,
+                  ]}
+                  onPress={() => {
+                    setSelectedPlan(plan.id);
+                    handleSubscribe(plan.id);
+                  }}
+                  activeOpacity={0.9}
+                >
+                  <Text style={[styles.ctaText, (plan.highlighted || selectedPlan === plan.id) && styles.ctaTextHighlighted]}>
+                    {plan.buttonText}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.divider} />
+
+                <View style={styles.features}>
+                  <Text style={styles.includesLabel}>INCLUDES:</Text>
+                  {plan.features.map((feat, idx) => (
+                    <View key={idx} style={styles.featureRow}>
+                      <MaterialIcons
+                        name={feat.included ? 'check-circle' : 'cancel'}
+                        size={18}
+                        color={feat.included ? colors.primary : '#D1D5DB'}
+                      />
+                      <Text style={[styles.featureText, !feat.included && styles.featureDisabled]}>
+                        {feat.name}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </Animated.View>
+            ))}
           </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.cardsContainer}
+            snapToInterval={isWeb ? 360 : width * 0.85}
+            decelerationRate="fast"
+          >
+            {plans.map((plan) => (
+              <Animated.View
+                key={plan.id}
+                style={(() => {
+                  const transforms: any[] = [{ scale: animValues[plan.id] }];
+                  if (plan.highlighted || selectedPlan === plan.id) transforms.push({ translateY: -6 });
+                  return [
+                    styles.card,
+                    (plan.highlighted || selectedPlan === plan.id) && styles.cardHighlighted,
+                    hoveredPlan === plan.id && ! (selectedPlan === plan.id) && styles.cardHover,
+                    { transform: transforms, opacity: fadeAnim, cursor: isWeb ? 'pointer' : undefined },
+                  ];
+                })()}
+                onTouchStart={() => setSelectedPlan(plan.id)}
+                onMouseDown={() => isWeb && setSelectedPlan(plan.id)}
+                onMouseEnter={() => {
+                  if (isWeb) {
+                    setHoveredPlan(plan.id);
+                    handleHoverIn(plan.id);
+                  }
+                }}
+                onMouseLeave={() => {
+                  if (isWeb) {
+                    setHoveredPlan(null);
+                    handleHoverOut(plan.id);
+                  }
+                }}
+              >
+                {plan.badge && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{plan.badge}</Text>
+                  </View>
+                )}
+
+                <View style={styles.cardHeader}>
+                  <Text style={styles.planName}>{plan.name}</Text>
+                  <Text style={styles.planDesc}>{plan.description}</Text>
+                </View>
+
+                <View style={styles.priceRow}>
+                  <Text style={styles.price}>{plan.price}</Text>
+                  <Text style={styles.period}>{plan.period}</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.cta,
+                    (plan.highlighted || selectedPlan === plan.id) && styles.ctaHighlighted,
+                  ]}
+                  onPress={() => {
+                    setSelectedPlan(plan.id);
+                    handleSubscribe(plan.id);
+                  }}
+                  activeOpacity={0.9}
+                >
+                  <Text style={[styles.ctaText, (plan.highlighted || selectedPlan === plan.id) && styles.ctaTextHighlighted]}>
+                    {plan.buttonText}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.divider} />
+
+                <View style={styles.features}>
+                  <Text style={styles.includesLabel}>INCLUDES:</Text>
+                  {plan.features.map((feat, idx) => (
+                    <View key={idx} style={styles.featureRow}>
+                      <MaterialIcons
+                        name={feat.included ? 'check-circle' : 'cancel'}
+                        size={18}
+                        color={feat.included ? colors.primary : '#D1D5DB'}
+                      />
+                      <Text style={[styles.featureText, !feat.included && styles.featureDisabled]}>
+                        {feat.name}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </Animated.View>
+            ))}
+          </ScrollView>
+        )}
+      </View>
+
+      {/* Privacy Note */}
+      <View style={styles.privacyNote}>
+        <MaterialIcons name="lock" size={16} color="#6B7280" />
+        <Text style={styles.privacyText}>
+          Your documents are private and secure. We do not use your data to train our models.
+        </Text>
+      </View>
+
+      {/* Comparison Table */}
+      <View style={styles.comparisonSection}>
+        <Text style={styles.comparisonTitle}>Compare features in detail</Text>
+        <View style={styles.table}>
+          {/* Header */}
+          <View style={styles.tableRow}>
+            <Text style={[styles.tableCell, styles.tableHeader, styles.tableCellFirst]}>Feature</Text>
+            <Text style={[styles.tableCell, styles.tableHeader]}>Free</Text>
+            <Text style={[styles.tableCell, styles.tableHeader, styles.tableHighlight]}>Scholar</Text>
+            <Text style={[styles.tableCell, styles.tableHeader]}>Genius</Text>
+          </View>
+
+          {/* Rows */}
+          {comparisonData.map((row, idx) => (
+            <View key={idx} style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}>
+              <Text style={[styles.tableCell, styles.tableCellFirst, styles.tableCellBold]}>{row.feature}</Text>
+              <Text style={styles.tableCell}>{row.free}</Text>
+              <Text style={[styles.tableCell, styles.tableDataHighlight]}>{row.scholar}</Text>
+              <Text style={styles.tableCell}>{row.genius}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* FAQ */}
+      <View style={styles.faqSection}>
+        <Text style={styles.faqTitle}>Frequently Asked Questions</Text>
+        {faqData.map((faq, idx) => (
+          <TouchableOpacity
+            key={idx}
+            style={styles.faqItem}
+            onPress={() => setExpandedFaq(expandedFaq === idx ? null : idx)}
+          >
+            <View style={styles.faqHeader}>
+              <Text style={styles.faqQuestion}>{faq.question}</Text>
+              <MaterialIcons
+                name={expandedFaq === idx ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                size={24}
+                color="#111827"
+              />
+            </View>
+            {expandedFaq === idx && <Text style={styles.faqAnswer}>{faq.answer}</Text>}
+          </TouchableOpacity>
         ))}
       </View>
 
-      {/* Auto-Pay Management Section */}
-      {selectedPlan === 'premium' && (
-        <View style={styles.autoPaySection}>
-          <View style={styles.autoPayHeader}>
-            <MaterialIcons name="schedule" size={24} color={colors.primary} />
-            <Text style={styles.autoPayTitle}>Auto-Pay Settings</Text>
-          </View>
-
-          <View style={styles.autoPayStatusBox}>
-            <View style={styles.statusIndicator}>
-              <MaterialIcons
-                name={autoPayEnabled ? 'check-circle' : 'info'}
-                size={24}
-                color={autoPayEnabled ? colors.success : colors.warning}
-              />
-              <View style={styles.statusText}>
-                <Text style={styles.statusLabel}>
-                  {autoPayEnabled ? 'Auto-Pay Enabled' : 'Auto-Pay Disabled'}
-                </Text>
-                <Text style={styles.statusDescription}>
-                  {autoPayEnabled
-                    ? 'Your subscription renews automatically every month'
-                    : 'Enable auto-pay to auto-renew your subscription'}
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.manageButton} onPress={handleManageAutopay}>
-              <Text style={styles.manageButtonText}>
-                {autoPayEnabled ? 'Manage' : 'Enable'}
-              </Text>
-              <MaterialIcons name="arrow-forward" size={18} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.billingInfo}>
-            <Text style={styles.billingLabel}>💳 Billing Information</Text>
-            <View style={styles.billingRow}>
-              <Text style={styles.billingKey}>Next Billing Date:</Text>
-              <Text style={styles.billingValue}>End of current month</Text>
-            </View>
-            <View style={styles.billingRow}>
-              <Text style={styles.billingKey}>Amount:</Text>
-              <Text style={styles.billingValue}>₹1.99</Text>
-            </View>
-            <View style={styles.billingRow}>
-              <Text style={styles.billingKey}>Renewal:</Text>
-              <Text style={styles.billingValue}>Monthly</Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* FAQ Section */}
-      <View style={styles.faqSection}>
-        <Text style={styles.faqTitle}>Frequently Asked Questions</Text>
-
-        <View style={styles.faqItem}>
-          <MaterialIcons name="help" size={20} color={colors.primary} />
-          <View style={styles.faqContent}>
-            <Text style={styles.faqQuestion}>Can I change my plan later?</Text>
-            <Text style={styles.faqAnswer}>Yes, you can upgrade or downgrade your plan anytime. Changes take effect immediately.</Text>
-          </View>
-        </View>
-
-        <View style={styles.faqItem}>
-          <MaterialIcons name="help" size={20} color={colors.primary} />
-          <View style={styles.faqContent}>
-            <Text style={styles.faqQuestion}>What payment methods do you accept?</Text>
-            <Text style={styles.faqAnswer}>We accept all major credit cards, debit cards, and UPI payments for Indian users.</Text>
-          </View>
-        </View>
-
-        <View style={styles.faqItem}>
-          <MaterialIcons name="help" size={20} color={colors.primary} />
-          <View style={styles.faqContent}>
-            <Text style={styles.faqQuestion}>Can I cancel anytime?</Text>
-            <Text style={styles.faqAnswer}>Absolutely! You can cancel your subscription anytime. No hidden fees or penalties.</Text>
-          </View>
-        </View>
-
-        <View style={styles.faqItem}>
-          <MaterialIcons name="help" size={20} color={colors.primary} />
-          <View style={styles.faqContent}>
-            <Text style={styles.faqQuestion}>What about refunds?</Text>
-            <Text style={styles.faqAnswer}>If you're not satisfied, we offer a 7-day money-back guarantee on all plans.</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Questions? Contact us at support@edtech.com</Text>
+      {/* CTA Banner */}
+      <View style={styles.ctaBanner}>
+        <Text style={styles.ctaBannerTitle}>Ready to ace your exams?</Text>
+        <Text style={styles.ctaBannerSubtitle}>
+          Join over 10,000 students who are studying smarter, not harder.
+        </Text>
+        {/* Buttons removed per request */}
       </View>
     </ScrollView>
   );
@@ -305,269 +415,344 @@ export const Pricing: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
   },
-  header: {
+  hero: {
     alignItems: 'center',
-    paddingVertical: spacing.xl,
     paddingHorizontal: spacing.lg,
+    paddingTop: 60,
+    paddingBottom: 40,
   },
-  headerTitle: {
-    ...typography.h2,
+  heroTitle: {
+    fontSize: 36,
     fontWeight: '700',
-    marginTop: spacing.md,
-  },
-  headerSubtitle: {
-    ...typography.body,
-    color: colors.textMuted,
-    marginTop: spacing.sm,
+    color: '#111827',
     textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 44,
   },
-  plansContainer: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
+  heroSubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    maxWidth: 600,
   },
-  planCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.border,
-    ...shadows.md,
+  cardsWrapper: {
+    marginVertical: 40,
   },
-  planCardHighlighted: {
-    borderColor: colors.primary,
-    borderWidth: 2,
-    backgroundColor: colors.blue50,
+  cardsContainer: {
+    paddingHorizontal: 24,
+    gap: 20,
+    flexDirection: isWeb ? 'row' : 'row',
+    justifyContent: isWeb ? 'space-between' : 'flex-start',
+    alignItems: 'stretch',
   },
-  popularBadge: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.full,
+  cardsGrid: {
     flexDirection: 'row',
-    gap: spacing.xs,
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'stretch',
+    paddingHorizontal: 24,
+    gap: 20,
   },
-  popularBadgeText: {
-    ...typography.small,
-    color: colors.white,
+  // Make cards stretch and occupy available width on large screens
+  card: {
+    flex: isWeb ? 1 : undefined,
+    maxWidth: isWeb ? 420 : undefined,
+    // width handled by flex/maxWidth for full-width layout
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 32,
+    marginRight: 16,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    marginHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  cardHighlighted: {
+    borderColor: colors.primary,
+    backgroundColor: '#F8FAFC',
+    shadowColor: colors.primary,
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+  },
+  cardHover: {
+    borderColor: '#93C5FD',
+    backgroundColor: '#F0F9FF',
+    shadowColor: '#93C5FD',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+  },
+  cardSelected: {
+    borderColor: colors.primary,
+    backgroundColor: '#F8FAFC',
+    shadowColor: colors.primary,
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 8,
+    transform: [{ translateY: -6 } as any],
+  },
+  badge: {
+    position: 'absolute',
+    top: -12,
+    left: '50%',
+    transform: [{ translateX: -55 }],
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
-  planHeader: {
-    marginBottom: spacing.lg,
-    marginTop: spacing.lg,
+  cardHeader: {
+    marginBottom: 20,
+    marginTop: 8,
   },
   planName: {
-    ...typography.h3,
+    fontSize: 24,
     fontWeight: '700',
-    marginBottom: spacing.sm,
+    color: '#111827',
+    marginBottom: 4,
   },
-  planDescription: {
-    ...typography.body,
-    color: colors.textMuted,
+  planDesc: {
+    fontSize: 14,
+    color: '#6B7280',
   },
-  priceSection: {
+  priceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: spacing.lg,
+    marginBottom: 20,
   },
   price: {
-    ...typography.h2,
+    fontSize: 48,
     fontWeight: '700',
-    color: colors.primary,
+    color: '#111827',
   },
   period: {
-    ...typography.body,
-    color: colors.textMuted,
-    marginLeft: spacing.sm,
+    fontSize: 16,
+    color: '#6B7280',
+    marginLeft: 4,
   },
-  ctaBox: {
-    backgroundColor: colors.blue100,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    flexDirection: 'row',
-    gap: spacing.md,
+  cta: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: 20,
+  },
+  ctaHighlighted: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   ctaText: {
-    ...typography.body,
-    color: colors.primary,
+    fontSize: 16,
     fontWeight: '600',
-    flex: 1,
+    color: colors.primary,
   },
-  subscribeButton: {
-    backgroundColor: colors.border,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-    marginBottom: spacing.lg,
+  ctaTextHighlighted: {
+    color: '#FFFFFF',
   },
-  subscribeButtonPremium: {
-    backgroundColor: colors.primary,
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 20,
   },
-  subscribeButtonText: {
-    ...typography.body,
+  features: {
+    gap: 10,
+  },
+  includesLabel: {
+    fontSize: 12,
     fontWeight: '700',
-    color: colors.textMuted,
-  },
-  subscribeButtonTextPremium: {
-    color: colors.white,
-  },
-  featuresSection: {
-    gap: spacing.md,
-  },
-  featuresTitle: {
-    ...typography.h4,
-    fontWeight: '700',
-    marginBottom: spacing.sm,
+    color: '#6B7280',
+    marginBottom: 4,
+    letterSpacing: 0.5,
   },
   featureRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 4,
   },
-  featureContent: {
+  featureText: {
+    fontSize: 14,
+    color: '#111827',
     flex: 1,
   },
-  featureName: {
-    ...typography.body,
-    fontWeight: '500',
-  },
-  featureNameDisabled: {
-    color: colors.textMuted,
+  featureDisabled: {
+    color: '#9CA3AF',
     textDecorationLine: 'line-through',
   },
-  featureLimit: {
-    ...typography.small,
-    color: colors.textMuted,
-    marginTop: spacing.xs / 2,
-  },
-  autoPaySection: {
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.lg,
-    backgroundColor: colors.blue50,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    ...shadows.sm,
-  },
-  autoPayHeader: {
+  privacyNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: '#F9FAFB',
+    marginHorizontal: 24,
+    borderRadius: 8,
+    marginBottom: 40,
   },
-  autoPayTitle: {
-    ...typography.h3,
-    fontWeight: '700',
-  },
-  autoPayStatusBox: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statusIndicator: {
-    flexDirection: 'row',
-    gap: spacing.md,
+  privacyText: {
+    fontSize: 12,
+    color: '#6B7280',
     flex: 1,
   },
-  statusText: {
-    flex: 1,
+  comparisonSection: {
+    paddingHorizontal: 24,
+    marginBottom: 40,
   },
-  statusLabel: {
-    ...typography.h4,
+  comparisonTitle: {
+    fontSize: 28,
     fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 32,
   },
-  statusDescription: {
-    ...typography.small,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
+  table: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  manageButton: {
+  tableRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
-  manageButtonText: {
-    ...typography.body,
+  tableRowAlt: {
+    backgroundColor: '#F9FAFB',
+  },
+  tableCell: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: '#111827',
+    textAlign: 'center',
+  },
+  tableCellFirst: {
+    textAlign: 'left',
+  },
+  tableHeader: {
     fontWeight: '700',
+    backgroundColor: '#F9FAFB',
+    borderBottomWidth: 2,
+  },
+  tableHighlight: {
+    backgroundColor: '#EEF2FF',
     color: colors.primary,
   },
-  billingInfo: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  billingLabel: {
-    ...typography.h4,
-    fontWeight: '700',
-    marginBottom: spacing.sm,
-  },
-  billingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  billingKey: {
-    ...typography.body,
-    color: colors.textMuted,
-  },
-  billingValue: {
-    ...typography.body,
+  tableDataHighlight: {
+    backgroundColor: '#F0F9FF',
     fontWeight: '600',
-    color: colors.text,
+    color: colors.primary,
+  },
+  tableCellBold: {
+    fontWeight: '600',
   },
   faqSection: {
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.xl,
+    paddingHorizontal: 24,
+    marginBottom: 40,
   },
   faqTitle: {
-    ...typography.h3,
+    fontSize: 28,
     fontWeight: '700',
-    marginBottom: spacing.lg,
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 32,
   },
   faqItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  faqHeader: {
     flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-    backgroundColor: colors.white,
-    padding: spacing.lg,
-    borderRadius: borderRadius.md,
-    ...shadows.sm,
-  },
-  faqContent: {
-    flex: 1,
-  },
-  faqQuestion: {
-    ...typography.h4,
-    fontWeight: '700',
-    marginBottom: spacing.sm,
-  },
-  faqAnswer: {
-    ...typography.body,
-    color: colors.textMuted,
-    lineHeight: 22,
-  },
-  footer: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xl,
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  footerText: {
-    ...typography.small,
-    color: colors.textMuted,
+  faqQuestion: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    flex: 1,
+    marginRight: 8,
+  },
+  faqAnswer: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 12,
+    lineHeight: 20,
+  },
+  ctaBanner: {
+    backgroundColor: colors.primary,
+    marginHorizontal: 24,
+    borderRadius: 16,
+    padding: 48,
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 40,
+  },
+  ctaBannerTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  ctaBannerSubtitle: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    opacity: 0.9,
+    marginBottom: 32,
+  },
+  ctaBannerButtons: {
+    flexDirection: isWeb ? 'row' : 'column',
+    gap: 12,
+    width: '100%',
+    maxWidth: 500,
+  },
+  ctaBannerBtn: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  ctaBannerBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  ctaBannerBtnSecondary: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  ctaBannerBtnSecondaryText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

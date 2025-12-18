@@ -88,6 +88,15 @@ export const Quiz: React.FC<QuizProps> = ({ quizData, loading }) => {
     );
   }
 
+  if (!quizData.questions || quizData.questions.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <MaterialIcons name="error-outline" size={64} color={colors.error} />
+        <Text style={styles.emptyText}>No questions available</Text>
+      </View>
+    );
+  }
+
   const question = quizData.questions[currentQuestion];
   const selectedAnswer = userAnswers.get(currentQuestion);
 
@@ -611,6 +620,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
+    backgroundColor: 'transparent',
+    minHeight: 400,
   },
   loadingText: {
     ...typography.body,

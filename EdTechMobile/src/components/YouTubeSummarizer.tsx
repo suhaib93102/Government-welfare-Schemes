@@ -118,7 +118,7 @@ export const YouTubeSummarizer: React.FC<YouTubeSummarizerProps> = ({ summaryDat
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl, backgroundColor: 'transparent', minHeight: 400 },
   loadingText: { ...typography.h3, color: colors.text, marginTop: spacing.md },
   contentWrapper: { alignSelf: 'center', width: '100%', maxWidth: isWeb && !isMobile ? 1100 : '100%', padding: spacing.lg },
   pageCard: { backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.lg, ...shadows.md, alignItems: 'center' },

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Dynamic API URL based on platform
 const getApiUrl = () => {
@@ -24,6 +25,50 @@ const api = axios.create({
   },
   timeout: 30000, // 30 second timeout
 });
+
+// Auth token management (persist in AsyncStorage)
+const AUTH_TOKEN_KEY = 'AUTH_TOKEN';
+
+export const setAuthToken = async (token: string | null) => {
+  try {
+    if (token) {
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+      delete api.defaults.headers.common['Authorization'];
+    }
+  } catch (e) {
+    // ignore storage errors for now
+    console.warn('Failed to persist auth token', e);
+  }
+};
+
+export const getAuthToken = async (): Promise<string | null> => {
+  try {
+    return await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+  } catch (e) {
+    return null;
+  }
+};
+
+// Initialize token from storage
+(async () => {
+  const t = await getAuthToken();
+  if (t) api.defaults.headers.common['Authorization'] = `Bearer ${t}`;
+})();
+
+// Response interceptor to handle 401 globally (optional)
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err?.response?.status === 401) {
+      // token invalid or expired - clear stored token
+      setAuthToken(null);
+    }
+    return Promise.reject(err);
+  }
+);
 
 /**
  * Solve question using text input
@@ -51,12 +96,37 @@ export const solveQuestionByImage = async (imageUri: string, maxResults: number 
   try {
     const formData = new FormData();
     
-    // Prepare image for upload
-    const imageFile = {
-      uri: imageUri,
-      type: 'image/jpeg',
-      name: 'question.jpg',
-    } as any;
+    let imageFile: any;
+    
+    if (Platform.OS === 'web') {
+      // For web, handle data URLs
+      if (imageUri.startsWith('data:')) {
+        // Convert data URL to blob
+        const arr = imageUri.split(',');
+        const mimeMatch = arr[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        imageFile = new File([blob], 'question.jpg', { type: mime });
+      } else {
+        // For blob URLs, fetch the blob
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        imageFile = new File([blob], 'question.jpg', { type: 'image/jpeg' });
+      }
+    } else {
+      // For mobile, use the uri directly
+      imageFile = {
+        uri: imageUri,
+        type: 'image/jpeg',
+        name: 'question.jpg',
+      } as any;
+    }
     
     formData.append('image', imageFile);
     formData.append('max_results', maxResults.toString());
@@ -441,6 +511,77 @@ export const getDailyQuiz = async (userId: string) => {
     return response.data;
   } catch (error: any) {
     throw new Error(error.response?.data?.error || error.message || 'Failed to get Daily Quiz');
+  }
+};
+
+/**
+ * User authentication (register / login)
+ */
+export const registerUser = async (username: string, email: string, password: string, full_name?: string) => {
+  try {
+    const response = await api.post('/auth/register/', {
+      username,
+      email,
+      password,
+      full_name: full_name || '',
+    });
+    const data = response.data;
+    const token = data?.token || data?.data?.token || (data?.data && data?.data?.access_token);
+    if (token) await setAuthToken(token);
+    return data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.response?.data?.message || error.message || 'Registration failed');
+  }
+};
+
+export const loginUser = async (usernameOrEmail: string, password: string) => {
+  try {
+    // Try to detect email format
+    const payload: any = { password };
+    if (usernameOrEmail.includes('@')) payload.email = usernameOrEmail;
+    else payload.username = usernameOrEmail;
+
+    const response = await api.post('/auth/login/', payload);
+    const data = response.data;
+    const token = data?.token || data?.data?.token || (data?.data && data?.data?.access_token);
+    if (token) await setAuthToken(token);
+    return data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.response?.data?.message || error.message || 'Login failed');
+  }
+};
+
+export const requestPasswordReset = async (email: string) => {
+  try {
+    const response = await api.post('/auth/request-password-reset/', {
+      email: email.toLowerCase().trim(),
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to request password reset');
+  }
+};
+
+export const validateResetToken = async (token: string) => {
+  try {
+    const response = await api.post('/auth/validate-reset-token/', {
+      token: token.trim(),
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.response?.data?.message || error.message || 'Invalid or expired reset token');
+  }
+};
+
+export const resetPassword = async (token: string, newPassword: string) => {
+  try {
+    const response = await api.post('/auth/reset-password/', {
+      token: token.trim(),
+      new_password: newPassword,
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to reset password');
   }
 };
 

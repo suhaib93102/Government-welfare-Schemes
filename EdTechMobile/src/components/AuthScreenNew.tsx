@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
+import { registerUser, loginUser } from '../services/api';
+import { ResetPasswordScreen } from './ResetPasswordScreen';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -25,7 +27,7 @@ interface AuthScreenNewProps {
 }
 
 export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onBack, onGuestLogin }) => {
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [loading, setLoading] = useState(false);
   
   // Login fields
@@ -56,17 +58,25 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
     }
 
     setLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const res = await loginUser(email, password);
       setLoading(false);
-      onAuthSuccess({
-        id: 'user_' + Date.now(),
-        name: email.split('@')[0],
-        email: email,
-        provider: 'email',
-      });
-    }, 1000);
+      if (res?.success) {
+        const data = res.data || res;
+        onAuthSuccess({
+          id: data.user_id || data.user?.id || 'user_' + Date.now(),
+          name: data.username || (data.user && data.user.username) || email.split('@')[0],
+          email: data.email || (data.user && data.user.email) || email,
+          provider: 'email',
+          token: data.token || data.access_token || (data.data && data.data.token),
+        });
+      } else {
+        Alert.alert('Login failed', res.error || res.message || 'Invalid credentials');
+      }
+    } catch (err: any) {
+      setLoading(false);
+      Alert.alert('Login error', err.message || 'Failed to login');
+    }
   };
 
   const handleSignup = async () => {
@@ -86,17 +96,26 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
     }
 
     setLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const username = signupEmail.split('@')[0];
+      const res = await registerUser(username, signupEmail, signupPassword, fullName);
       setLoading(false);
-      onAuthSuccess({
-        id: 'user_' + Date.now(),
-        name: fullName,
-        email: signupEmail,
-        provider: 'email',
-      });
-    }, 1000);
+      if (res?.success) {
+        const data = res.data || res;
+        onAuthSuccess({
+          id: data.user_id || data.user?.id || 'user_' + Date.now(),
+          name: data.username || (data.user && data.user.username) || fullName,
+          email: data.email || (data.user && data.user.email) || signupEmail,
+          provider: 'email',
+          token: data.token || (data.data && data.data.token) || null,
+        });
+      } else {
+        Alert.alert('Signup failed', res.error || res.message || 'Registration error');
+      }
+    } catch (err: any) {
+      setLoading(false);
+      Alert.alert('Signup error', err.message || 'Failed to register');
+    }
   };
 
   const handleGoogleSignIn = () => {
@@ -150,7 +169,10 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
           </View>
         </View>
 
-        <TouchableOpacity style={styles.forgotPassword}>
+        <TouchableOpacity 
+          style={styles.forgotPassword}
+          onPress={() => setMode('reset')}
+        >
           <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
         </TouchableOpacity>
 
@@ -289,6 +311,15 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
       </View>
     </View>
   );
+
+  if (mode === 'reset') {
+    return (
+      <ResetPasswordScreen
+        onClose={() => setMode('login')}
+        onBackToLogin={() => setMode('login')}
+      />
+    );
+  }
 
   return (
     <KeyboardAvoidingView 

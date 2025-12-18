@@ -15,6 +15,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
 import { getDailyQuiz, submitDailyQuiz, startDailyQuiz, getUserCoins } from '../services/api';
+import { getDailyQuizQuestions } from '../services/mockTestService';
 import LoadingWebm from './LoadingWebm';
 
 const { width } = Dimensions.get('window');
@@ -97,61 +98,49 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
     try {
       setLoading(true);
       console.log('Loading quiz for user:', userId);
-      const data = await getDailyQuiz(userId);
-
-      console.log('Daily Quiz Data:', JSON.stringify(data, null, 2));
-
-      // Ensure data has expected shape and fallback defaults
-      const rawQuestions = Array.isArray(data?.questions) ? data.questions : [];
-
-      const normalizeText = (value: any): string => {
-        if (typeof value === 'string') return value;
-        if (value && typeof value === 'object') {
-          if (typeof value.text === 'string') return value.text;
-          if (typeof value.label === 'string') return value.label;
-          if (typeof value.value === 'string') return value.value;
-          return JSON.stringify(value);
-        }
-        if (value === null || value === undefined) return '';
-        return String(value);
-      };
-
-      const normalizeOptions = (opts: any): string[] => {
-        if (!Array.isArray(opts)) return [];
-        return opts.map((opt: any) => {
-          return normalizeText(opt);
-        });
-      };
-
-      const questions = rawQuestions.slice(0, 5).map((q: any, idx: number) => ({
+      
+      // Use local DailyQuiz.json file with 20 random questions
+      const localQuizData = getDailyQuizQuestions(20);
+      
+      // Format the data to match expected structure
+      const questions = localQuizData.questions.map((q: any, idx: number) => ({
         id: q.id ?? idx + 1,
-        question: normalizeText(q.question ?? q.question_text ?? 'Question not available'),
-        options: normalizeOptions(q.options),
-        category: normalizeText(q.category ?? 'general'),
-        difficulty: normalizeText(q.difficulty ?? 'medium'),
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+        category: q.category || 'general',
+        difficulty: q.difficulty || 'medium',
       }));
 
-      const coins = data?.coins || { attempt_bonus: 5, per_correct_answer: 5, max_possible: 5 + (questions.length * 5) };
+      const coins = { 
+        attempt_bonus: 5, 
+        per_correct_answer: 5, 
+        max_possible: 5 + (questions.length * 5) 
+      };
 
-      // If the user already attempted, show completed state
-      if (data.already_attempted) {
-        console.log('Setting state to completed with results:', data.result);
-        setQuizData({ ...data, questions, coins });
-        setQuizState('completed');
-        setResults(data.result);
-      } else if (questions.length === 0) {
-        // No questions - show fallback and allow retry
-        console.warn('No questions returned for daily quiz');
-        setQuizData({ ...data, questions, coins });
-        setQuizState('not-started');
-      } else {
-        console.log('Setting quiz data and state to not-started');
-        setQuizData({ ...data, questions, coins });
-        setQuizState('not-started');
-      }
+      // Set quiz data with local questions
+      const quizData = {
+        quiz_id: 'daily-quiz-' + Date.now(),
+        questions,
+        coins,
+        quiz_metadata: {
+          quiz_type: 'daily_coin_quiz',
+          total_questions: questions.length,
+          difficulty: 'mixed',
+          date: new Date().toISOString().split('T')[0],
+          title: localQuizData.title,
+          description: 'Test your knowledge with today\'s quiz!',
+        },
+      };
+
+      console.log('Loaded', questions.length, 'random questions from DailyQuiz.json');
+      setQuizData(quizData);
+      setQuizState('not-started');
+      
     } catch (error: any) {
       console.error('Failed to load quiz:', error);
-      // Do not automatically close; show fallback UI and allow retry
+      // Show fallback UI
       setQuizData({ questions: [], coins: { attempt_bonus: 5, per_correct_answer: 5, max_possible: 5 } });
       setQuizState('not-started');
     } finally {
@@ -163,9 +152,9 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
     try {
       console.log('Starting quiz with ID:', quizData.quiz_id);
       console.log('Quiz has questions:', quizData.questions?.length);
-      setLoading(true);
-      const res = await startDailyQuiz(userId, quizData.quiz_id);
-      const coinsAwarded = res?.coins_awarded ?? quizData?.coins?.attempt_bonus ?? 5;
+      
+      // Award attempt bonus coins locally
+      const coinsAwarded = quizData?.coins?.attempt_bonus ?? 5;
       setAttemptCoinsAwarded(coinsAwarded);
       animateCoins();
       setCurrentQuestionIndex(0);
@@ -175,8 +164,6 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
     } catch (error: any) {
       console.error('Failed to start quiz:', error);
       Alert.alert('Error', error.message || 'Failed to start quiz');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -248,12 +235,59 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
       setLoading(true);
       const timeTaken = Math.floor((Date.now() - startTime) / 1000);
       console.log('Time taken:', timeTaken, 'seconds');
-      const result = await submitDailyQuiz(userId, quizData.quiz_id, answers, timeTaken);
       
-      console.log('Quiz submitted successfully, result:', result);
-      // The API returns result inside 'result' and coin breakdown keys
-      const coinsEarned = result?.result?.coins_earned ?? result?.coins_earned ?? result?.result?.total_earned ?? 0;
-      setAttemptCoinsAwarded(coinsEarned);
+      // Calculate results locally
+      let correctCount = 0;
+      const resultsDetails: any[] = [];
+      
+      quizData.questions.forEach((question: any, idx: number) => {
+        const questionId = String(idx + 1);
+        const userAnswer = answers[questionId];
+        const correctAnswer = question.correctAnswer ?? 0;
+        const isCorrect = userAnswer === correctAnswer;
+        
+        if (isCorrect) {
+          correctCount++;
+        }
+        
+        resultsDetails.push({
+          question_id: idx,
+          question: question.question,
+          options: question.options,
+          user_answer: question.options[userAnswer] || 'No answer',
+          correct_answer: question.options[correctAnswer] || 'Unknown',
+          is_correct: isCorrect,
+          explanation: question.explanation || 'No explanation available',
+          fun_fact: question.fun_fact || '',
+          category: question.category,
+        });
+      });
+      
+      const totalQuestions = quizData.questions.length;
+      const scorePercentage = (correctCount / totalQuestions) * 100;
+      const perCorrectCoins = quizData.coins?.per_correct_answer ?? 5;
+      const coinsFromCorrect = correctCount * perCorrectCoins;
+      const attemptBonus = attemptCoinsAwarded;
+      const totalCoinsEarned = attemptBonus + coinsFromCorrect;
+      
+      const result = {
+        result: {
+          correct_count: correctCount,
+          total_questions: totalQuestions,
+          score_percentage: scorePercentage,
+          coins_earned: totalCoinsEarned,
+          attempt_bonus: attemptBonus,
+          per_correct: perCorrectCoins,
+          results: resultsDetails,
+        },
+        correct_count: correctCount,
+        total_questions: totalQuestions,
+        score_percentage: scorePercentage,
+        coins_earned: totalCoinsEarned,
+      };
+      
+      console.log('Quiz completed locally, result:', result);
+      setAttemptCoinsAwarded(totalCoinsEarned);
       setResults(result);
       setQuizState('completed');
       animateCoins();
@@ -691,6 +725,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
+    backgroundColor: 'transparent',
+    minHeight: 400,
   },
   loadingText: {
     ...typography.body,

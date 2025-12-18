@@ -23,9 +23,9 @@ const AnimatedLoader: React.FC<AnimatedLoaderProps> = ({
   const opacity = useRef(new Animated.Value(0)).current;
 
   const sizeMap = {
-    small: 40,
-    medium: 70,
-    large: 100,
+    small: 60,
+    medium: 100,
+    large: 150,
   };
 
   const coinSize = sizeMap[size];
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 9999,
