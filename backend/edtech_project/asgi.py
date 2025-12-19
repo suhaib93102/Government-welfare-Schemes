@@ -8,9 +8,17 @@ https://docs.djangoproject.com/en/5.0/howto/deployment/asgi/
 """
 
 import os
-
+import socketio
 from django.core.asgi import get_asgi_application
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "edtech_project.settings")
 
-application = get_asgi_application()
+# Initialize Django ASGI application
+django_asgi_app = get_asgi_application()
+
+# Import Socket.IO server (after Django setup)
+from question_solver.socketio_server import sio
+
+# Combine Django and Socket.IO
+application = socketio.ASGIApp(sio, django_asgi_app)
+

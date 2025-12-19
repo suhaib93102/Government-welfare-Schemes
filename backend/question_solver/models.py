@@ -490,3 +490,71 @@ class PasswordResetToken(models.Model):
     def is_valid(self):
         """Check if token is still valid (not expired and not used)"""
         return not self.is_used and timezone.now() < self.expires_at
+
+
+class PairQuizSession(models.Model):
+    """Store pair quiz session data for real-time collaboration"""
+    STATUS_CHOICES = [
+        ('waiting', 'Waiting for Partner'),
+        ('active', 'Active'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session_code = models.CharField(max_length=10, unique=True, db_index=True)  # e.g., "QZ-84K9"
+    
+    # Participants
+    host_user_id = models.CharField(max_length=255)
+    partner_user_id = models.CharField(max_length=255, null=True, blank=True)
+    
+    # Quiz configuration
+    quiz_config = models.JSONField(default=dict)  # {subject, difficulty, numQuestions, etc.}
+    questions = models.JSONField(default=list)  # Generated questions
+    
+    # Session state
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='waiting')
+    current_question_index = models.IntegerField(default=0)
+    
+    # Answers
+    host_answers = models.JSONField(default=dict)  # {questionIndex: selectedOption}
+    partner_answers = models.JSONField(default=dict)
+    
+    # Timing
+    timer_seconds = models.IntegerField(default=0)  # Shared timer
+    host_time_taken = models.IntegerField(default=0)  # Individual tracking
+    partner_time_taken = models.IntegerField(default=0)
+    
+    # Results
+    host_score = models.FloatField(null=True, blank=True)
+    partner_score = models.FloatField(null=True, blank=True)
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField()  # Auto-expire after 30 minutes
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['session_code']),
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['host_user_id']),
+        ]
+    
+    def __str__(self):
+        return f"Pair Quiz {self.session_code} - {self.status}"
+    
+    def is_expired(self):
+        """Check if session has expired"""
+        return timezone.now() > self.expires_at
+    
+    def generate_session_code(self):
+        """Generate unique 6-character session code"""
+        import random
+        import string
+        while True:
+            code = 'QZ-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+            if not PairQuizSession.objects.filter(session_code=code).exists():
+                return code

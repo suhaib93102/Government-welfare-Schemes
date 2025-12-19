@@ -150,7 +150,8 @@ class RegisterView(APIView):
             from .models import UserCoins
             UserCoins.objects.create(
                 user_id=str(user.id),
-                coins=0
+                total_coins=0,
+                lifetime_coins=0,
             )
 
             logger.info(f"New user registered: {username} ({email})")
@@ -174,8 +175,6 @@ class RegisterView(APIView):
                 'success': False,
                 'error': 'An error occurred during registration'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
 @method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
     """
@@ -189,8 +188,17 @@ class LoginView(APIView):
 
     def post(self, request):
         try:
-            username_or_email = request.data.get('username') or request.data.get('email', '').strip()
+            # Accept multiple possible keys coming from clients
+            username_or_email = (
+                request.data.get('username') or
+                request.data.get('email') or
+                request.data.get('identifier') or
+                request.data.get('username_or_email', '')
+            )
+            username_or_email = (username_or_email or '').strip()
             password = request.data.get('password', '')
+
+            logger.debug(f"Login attempt: username_or_email={username_or_email}, password_length={len(password)}")
 
             if not username_or_email or not password:
                 return Response({
@@ -198,33 +206,39 @@ class LoginView(APIView):
                     'error': 'Username/email and password are required'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            # Check if input is email or username
+            # Determine whether this is an email or username and perform case-insensitive lookup
             user = None
             if '@' in username_or_email:
-                # Email login
+                email_val = username_or_email.lower()
                 try:
-                    user = User.objects.get(email=username_or_email.lower())
-                except User.DoesNotExist:
-                    pass
+                    user = User.objects.filter(email__iexact=email_val).first()
+                    logger.debug(f"Email lookup for: {email_val} -> {user and user.username}")
+                except Exception:
+                    user = None
             else:
-                # Username login
+                uname = username_or_email
                 try:
-                    user = User.objects.get(username=username_or_email)
-                except User.DoesNotExist:
-                    pass
+                    user = User.objects.filter(username__iexact=uname).first()
+                    logger.debug(f"Username lookup for: {uname} -> {user and user.username}")
+                except Exception:
+                    user = None
 
-            # Invalid credentials
+            # Invalid credentials - differentiate between user not found and wrong password
             if not user:
+                logger.info(f"Login failed - no matching user for identifier: {username_or_email}")
                 return Response({
                     'success': False,
-                    'error': 'Invalid credentials'
+                    'error': 'User not found. Please check your username/email or sign up for a new account.',
+                    'error_code': 'USER_NOT_FOUND'
                 }, status=status.HTTP_401_UNAUTHORIZED)
 
-            # Check password
-            if not check_password(password, user.password):
+            # Use User method to check password (handles hashing)
+            if not user.check_password(password):
+                logger.info(f"Login failed - invalid password for user: {user.username}")
                 return Response({
                     'success': False,
-                    'error': 'Invalid credentials'
+                    'error': 'Incorrect password. Please try again.',
+                    'error_code': 'INVALID_PASSWORD'
                 }, status=status.HTTP_401_UNAUTHORIZED)
 
             # Generate JWT token
@@ -234,7 +248,7 @@ class LoginView(APIView):
             from .models import UserCoins
             user_coins_obj, created = UserCoins.objects.get_or_create(
                 user_id=str(user.id),
-                defaults={'coins': 0}
+                defaults={'total_coins': 0, 'lifetime_coins': 0}
             )
 
             logger.info(f"User logged in: {user.username}")
@@ -248,7 +262,7 @@ class LoginView(APIView):
                     'email': user.email,
                     'full_name': f"{user.first_name} {user.last_name}".strip(),
                     'token': token,
-                    'coins': user_coins_obj.coins,
+                    'coins': user_coins_obj.total_coins,
                     'last_login': user.last_login.isoformat() if user.last_login else None
                 }
             }, status=status.HTTP_200_OK)
@@ -301,7 +315,7 @@ class VerifyTokenView(APIView):
             from .models import UserCoins
             user_coins_obj, created = UserCoins.objects.get_or_create(
                 user_id=str(user.id),
-                defaults={'coins': 0}
+                defaults={'total_coins': 0, 'lifetime_coins': 0}
             )
 
             return Response({
@@ -311,7 +325,7 @@ class VerifyTokenView(APIView):
                     'username': user.username,
                     'email': user.email,
                     'full_name': f"{user.first_name} {user.last_name}".strip(),
-                    'coins': user_coins_obj.coins,
+                    'coins': user_coins_obj.total_coins,
                     'is_active': user.is_active,
                     'date_joined': user.date_joined.isoformat()
                 }
@@ -462,20 +476,14 @@ class RequestPasswordResetView(APIView):
             try:
                 send_mail(
                     subject='Password Reset Request',
-                    message=f"""
-Hello {user.first_name or user.username},
-
-We received a request to reset your password. Click the link below to reset it:
-
-{reset_link}
-
-This link will expire in 24 hours.
-
-If you didn't request this, you can safely ignore this email.
-
-Best regards,
-EdTech Support Team
-                    """,
+                    message=(
+                        "Hello %s,\n\n"
+                        "We received a request to reset your password. Click the link below to reset it:\n\n"
+                        "%s\n\n"
+                        "This link will expire in 24 hours.\n\n"
+                        "If you didn't request this, you can safely ignore this email.\n\n"
+                        "Best regards,\nEdTech Support Team"
+                    ) % (user.first_name or user.username, reset_link),
                     from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@edtech.com'),
                     recipient_list=[user.email],
                     fail_silently=False,

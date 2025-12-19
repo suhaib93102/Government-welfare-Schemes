@@ -5,6 +5,15 @@ Django settings for edtech_project project.
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import warnings
+
+# Suppress noisy FutureWarning from google.api_core about Python EOL
+# This doesn't fix the underlying Python version — upgrade Python to 3.11+ to remove permanently.
+warnings.filterwarnings(
+    "ignore",
+    category=FutureWarning,
+    module=r"google\.api_core\._python_version_support"
+)
 
 # Load environment variables
 load_dotenv()

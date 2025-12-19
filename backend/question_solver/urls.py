@@ -51,7 +51,14 @@ from .daily_quiz_views import (
     start_daily_quiz,
     submit_daily_quiz,
     get_user_coins,
-    get_quiz_history
+    get_quiz_history,
+    get_daily_quiz_attempt_detail,
+)
+from .pair_quiz_views import (
+    CreatePairQuizView,
+    JoinPairQuizView,
+    PairQuizSessionView,
+    CancelPairQuizView
 )
 
 urlpatterns = [
@@ -103,4 +110,11 @@ urlpatterns = [
     path('daily-quiz/submit/', submit_daily_quiz, name='submit-daily-quiz'),
     path('daily-quiz/coins/', get_user_coins, name='user-coins'),
     path('daily-quiz/history/', get_quiz_history, name='quiz-history'),
+    path('daily-quiz/attempt/detail/', get_daily_quiz_attempt_detail, name='daily-quiz-attempt-detail'),
+    
+    # Pair Quiz endpoints
+    path('pair-quiz/create/', CreatePairQuizView.as_view(), name='create-pair-quiz'),
+    path('pair-quiz/join/', JoinPairQuizView.as_view(), name='join-pair-quiz'),
+    path('pair-quiz/<str:session_id>/', PairQuizSessionView.as_view(), name='pair-quiz-session'),
+    path('pair-quiz/<str:session_id>/cancel/', CancelPairQuizView.as_view(), name='cancel-pair-quiz'),
 ]

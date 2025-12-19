@@ -474,3 +474,64 @@ def get_quiz_history(request):
         return Response({
             'error': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+def get_daily_quiz_attempt_detail(request):
+    """
+    Get detailed per-question results for a user's completed attempt
+    GET params: user_id, quiz_id
+    """
+    user_id = request.query_params.get('user_id', 'anonymous')
+    quiz_id = request.query_params.get('quiz_id')
+
+    if not quiz_id:
+        return Response({'error': 'quiz_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        daily_quiz = DailyQuiz.objects.get(id=quiz_id, is_active=True)
+        attempt = UserDailyQuizAttempt.objects.filter(daily_quiz=daily_quiz, user_id=user_id).first()
+
+        if not attempt or not attempt.completed_at:
+            return Response({'error': 'No completed attempt found for this user and quiz'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Reconstruct results
+        questions = list(DailyQuestion.objects.filter(daily_quiz=daily_quiz).order_by('order')[:attempt.total_questions])
+        results = []
+        for idx, q in enumerate(questions, 1):
+            user_answer_idx = attempt.answers.get(str(idx), -1)
+            correct_idx = ord(q.correct_answer.upper()) - ord('A') if q.correct_answer else -1
+            options = q.options if isinstance(q.options, list) else []
+            user_answer_text = options[user_answer_idx] if 0 <= user_answer_idx < len(options) else 'No answer'
+            correct_answer_text = options[correct_idx] if 0 <= correct_idx < len(options) else q.correct_answer
+
+            results.append({
+                'question_id': idx,
+                'question': q.question_text,
+                'options': options,
+                'user_answer': user_answer_text,
+                'user_answer_index': user_answer_idx,
+                'correct_answer': correct_answer_text,
+                'correct_answer_index': correct_idx,
+                'is_correct': (user_answer_idx == correct_idx),
+                'explanation': q.explanation,
+                'fun_fact': q.fun_fact or '',
+                'category': q.category,
+            })
+
+        return Response({
+            'success': True,
+            'quiz_id': str(daily_quiz.id),
+            'date': str(daily_quiz.date),
+            'results': results,
+            'correct_count': attempt.correct_count,
+            'total_questions': attempt.total_questions,
+            'score_percentage': attempt.score_percentage,
+            'coins_earned': attempt.coins_earned,
+            'completed_at': attempt.completed_at,
+        }, status=status.HTTP_200_OK)
+
+    except DailyQuiz.DoesNotExist:
+        return Response({'error': 'Quiz not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error fetching attempt detail: {e}", exc_info=True)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -147,9 +147,17 @@ class APITester:
             )
             
             if created:
+                user.set_password('testpassword123')
+                user.save()
                 self.print_success(f"Created test user: {user.username}")
             else:
-                self.print_info(f"Using existing test user: {user.username}")
+                # Ensure password is set
+                if not user.check_password('testpassword123'):
+                    user.set_password('testpassword123')
+                    user.save()
+                    self.print_info(f"Updated password for existing test user: {user.username}")
+                else:
+                    self.print_info(f"Using existing test user: {user.username}")
             
             self.user = user
             self.log_result("Create Test User", True)
