@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import { colors, spacing, borderRadius, typography, shadows } from '../styles/th
 import { registerUser, loginUser } from '../services/api';
 import { ResetPasswordScreen } from './ResetPasswordScreen';
 
-const { width } = Dimensions.get('window');
+const { width: initialWidth } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
 
 interface AuthScreenNewProps {
@@ -29,17 +29,31 @@ interface AuthScreenNewProps {
 export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onBack, onGuestLogin }) => {
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [loading, setLoading] = useState(false);
+  const [width, setWidth] = useState(initialWidth);
+  const isMobile = width < 768 && !isWeb;
+
+  useEffect(() => {
+    const sub = (Dimensions as any).addEventListener?.('change', ({ window }: any) => {
+      setWidth(window.width);
+    });
+    return () => sub?.remove?.();
+  }, []);
   
   // Login fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [lastLoginError, setLastLoginError] = useState<string | null>(null);
   
   // Signup fields
   const [fullName, setFullName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [signupError, setSignupError] = useState<string | null>(null);
 
   const validateEmail = (email: string) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -47,58 +61,141 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
   };
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
+    const identifier = (email || '').trim();
+    if (!identifier || !password) {
+      Alert.alert('Error', 'Please enter both username/email and password');
       return;
     }
-    
-    if (!validateEmail(email)) {
+
+    // If it looks like an email address, validate the format
+    if (identifier.includes('@') && !validateEmail(identifier)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
     setLoading(true);
+    setLastLoginError(null);
+
     try {
-      const res = await loginUser(email, password);
+      const res = await loginUser(identifier, password);
       setLoading(false);
+      setLoginAttempts(0); // Reset on success
+
       if (res?.success) {
         const data = res.data || res;
         onAuthSuccess({
           id: data.user_id || data.user?.id || 'user_' + Date.now(),
-          name: data.username || (data.user && data.user.username) || email.split('@')[0],
-          email: data.email || (data.user && data.user.email) || email,
+          name: data.username || (data.user && data.user.username) || identifier.split('@')[0],
+          email: data.email || (data.user && data.user.email) || (identifier.includes('@') ? identifier.toLowerCase() : undefined),
           provider: 'email',
           token: data.token || data.access_token || (data.data && data.data.token),
         });
       } else {
-        Alert.alert('Login failed', res.error || res.message || 'Invalid credentials');
+        // Handle specific error codes from backend
+        const newAttempts = loginAttempts + 1;
+        setLoginAttempts(newAttempts);
+
+        let errorMessage = res.error || res.message || 'Login failed';
+        if (res.error_code === 'USER_NOT_FOUND') {
+          errorMessage = 'User not found. Please check your username/email or sign up for a new account.';
+        } else if (res.error_code === 'INVALID_PASSWORD') {
+          errorMessage = 'Incorrect password. Please try again.';
+          if (newAttempts >= 3) {
+            errorMessage += ' Consider resetting your password if you\'ve forgotten it.';
+          }
+        }
+
+        setLastLoginError(errorMessage);
+        Alert.alert('Login failed', errorMessage);
       }
     } catch (err: any) {
       setLoading(false);
-      Alert.alert('Login error', err.message || 'Failed to login');
+      const newAttempts = loginAttempts + 1;
+      setLoginAttempts(newAttempts);
+      console.error('Login error:', err);
+
+      // Handle different types of errors
+      let errorMessage = 'Failed to login';
+      if (err.response) {
+        // Server responded with error status
+        const status = err.response.status;
+        const data = err.response.data;
+
+        if (status === 400) {
+          errorMessage = data?.error || 'Invalid request. Please check your input.';
+        } else if (status === 401) {
+          errorMessage = data?.error || 'Invalid credentials';
+        } else if (status === 429) {
+          errorMessage = 'Too many login attempts. Please try again later.';
+        } else if (status >= 500) {
+          errorMessage = 'Server error. Please try again later.';
+        } else {
+          errorMessage = data?.error || `Login failed (${status})`;
+        }
+      } else if (err.request) {
+        // Network error
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+        if (newAttempts < 3) {
+          errorMessage += ' (This was attempt ' + newAttempts + ' of 3)';
+        }
+      } else {
+        // Other error
+        errorMessage = err.message || 'An unexpected error occurred';
+      }
+
+      setLastLoginError(errorMessage);
+      Alert.alert('Login error', errorMessage);
     }
   };
 
   const handleSignup = async () => {
-    if (!fullName || !signupEmail || !signupPassword) {
+    // Clear previous error
+    setSignupError(null);
+
+    // Validation
+    if (!fullName || !signupEmail || !signupPassword || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
     
-    if (!validateEmail(signupEmail)) {
+    const emailNormalized = (signupEmail || '').trim().toLowerCase();
+    if (!validateEmail(emailNormalized)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
     if (signupPassword.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters');
+      Alert.alert('Error', 'Password must be at least 8 characters long');
+      return;
+    }
+
+    // Check password match
+    if (signupPassword !== confirmPassword) {
+      setSignupError('Passwords do not match');
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
+    // Password strength validation
+    const hasUpperCase = /[A-Z]/.test(signupPassword);
+    const hasLowerCase = /[a-z]/.test(signupPassword);
+    const hasNumber = /[0-9]/.test(signupPassword);
+    
+    if (!hasUpperCase || !hasLowerCase || !hasNumber) {
+      Alert.alert(
+        'Weak Password', 
+        'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+      );
       return;
     }
 
     setLoading(true);
     try {
-      const username = signupEmail.split('@')[0];
-      const res = await registerUser(username, signupEmail, signupPassword, fullName);
+      // Derive a safe username from the email local-part
+      let username = emailNormalized.split('@')[0] || `user${Date.now()}`;
+      username = username.replace(/[^a-zA-Z0-9_]/g, '').substring(0, 30);
+      if (!username) username = `user${Date.now()}`;
+      const res = await registerUser(username, emailNormalized, signupPassword, fullName);
       setLoading(false);
       if (res?.success) {
         const data = res.data || res;
@@ -114,31 +211,61 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
       }
     } catch (err: any) {
       setLoading(false);
-      Alert.alert('Signup error', err.message || 'Failed to register');
+      console.error('Signup error:', err);
+
+      // Handle different types of signup errors
+      let errorMessage = 'Failed to register';
+      if (err.response) {
+        const status = err.response.status;
+        const data = err.response.data;
+
+        if (status === 400) {
+          errorMessage = data?.error || 'Invalid registration data. Please check your input.';
+        } else if (status === 409) {
+          errorMessage = data?.error || 'User already exists with this email.';
+        } else if (status >= 500) {
+          errorMessage = 'Server error. Please try again later.';
+        } else {
+          errorMessage = data?.error || `Registration failed (${status})`;
+        }
+      } else if (err.request) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else {
+        errorMessage = err.message || 'An unexpected error occurred';
+      }
+
+      Alert.alert('Signup error', errorMessage);
     }
   };
 
-  const handleGoogleSignIn = () => {
-    Alert.alert('Google Sign-In', 'Google OAuth integration coming soon!');
-  };
+  // Google Sign-In removed
 
   const renderLogin = () => (
-    <View style={styles.formContainer}>
+    <View style={[styles.formContainer, isMobile && styles.formContainerMobile]}>
+      {/* Add logo circle at top for mobile */}
+      {isMobile && (
+        <View style={styles.mobileLogoContainer}>
+          <View style={styles.logoCircle}>
+            <MaterialIcons name="school" size={48} color={colors.primary} />
+          </View>
+        </View>
+      )}
+
       <Text style={styles.title}>Welcome Back!</Text>
       <Text style={styles.subtitle}>Log into your account to continue your learning journey</Text>
 
       <View style={styles.form}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Email Address</Text>
+          <Text style={styles.label}>Email or Username</Text>
           <View style={styles.inputWrapper}>
             <MaterialIcons name="email" size={20} color={colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="example@email.com"
+              placeholder="Rahuljha996886"
               placeholderTextColor={colors.textMuted}
               value={email}
               onChangeText={setEmail}
-              keyboardType="email-address"
+              keyboardType="default"
               autoCapitalize="none"
               autoCorrect={false}
             />
@@ -151,10 +278,13 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
             <MaterialIcons name="lock" size={20} color={colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={[styles.input, { flex: 1 }]}
-              placeholder="Enter your password"
+              placeholder="••••••••••"
               placeholderTextColor={colors.textMuted}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (lastLoginError) setLastLoginError(null); // Clear error on input change
+              }}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
@@ -167,6 +297,9 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
               />
             </TouchableOpacity>
           </View>
+          {lastLoginError && (
+            <Text style={styles.errorText}>{lastLoginError}</Text>
+          )}
         </View>
 
         <TouchableOpacity 
@@ -184,30 +317,23 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
           {loading ? (
             <ActivityIndicator color={colors.white} />
           ) : (
-            <Text style={styles.submitButtonText}>Login</Text>
+            <Text style={styles.submitButtonText}>Log in</Text>
           )}
         </TouchableOpacity>
 
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <TouchableOpacity style={styles.googleButton} onPress={handleGoogleSignIn}>
-          <MaterialIcons name="g-translate" size={20} color={colors.text} />
-          <Text style={styles.googleButtonText}>Continue with Google</Text>
-        </TouchableOpacity>
-
         {onGuestLogin && (
-          <TouchableOpacity style={styles.guestButton} onPress={onGuestLogin}>
+          <TouchableOpacity 
+            style={styles.guestButton}
+            onPress={onGuestLogin}
+            disabled={loading}
+          >
             <MaterialIcons name="person-outline" size={20} color={colors.textMuted} />
             <Text style={styles.guestButtonText}>Continue as Guest</Text>
           </TouchableOpacity>
         )}
 
         <View style={styles.switchMode}>
-          <Text style={styles.switchModeText}>Don't have an account? </Text>
+          <Text style={styles.switchModeText}>New here? </Text>
           <TouchableOpacity onPress={() => setMode('signup')}>
             <Text style={styles.switchModeLink}>Sign up</Text>
           </TouchableOpacity>
@@ -217,7 +343,16 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
   );
 
   const renderSignup = () => (
-    <View style={styles.formContainer}>
+    <View style={[styles.formContainer, isMobile && styles.formContainerMobile]}>
+      {/* Add logo circle at top for mobile */}
+      {isMobile && (
+        <View style={styles.mobileLogoContainer}>
+          <View style={styles.logoCircle}>
+            <MaterialIcons name="school" size={48} color={colors.primary} />
+          </View>
+        </View>
+      )}
+
       <Text style={styles.title}>Create Account</Text>
       <Text style={styles.subtitle}>Start your learning journey today</Text>
 
@@ -264,7 +399,10 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
               placeholder="Minimum 8 characters"
               placeholderTextColor={colors.textMuted}
               value={signupPassword}
-              onChangeText={setSignupPassword}
+              onChangeText={(text) => {
+                setSignupPassword(text);
+                if (signupError) setSignupError(null);
+              }}
               secureTextEntry={!showSignupPassword}
               autoCapitalize="none"
               autoCorrect={false}
@@ -279,6 +417,36 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
           </View>
         </View>
 
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Confirm Password</Text>
+          <View style={styles.inputWrapper}>
+            <MaterialIcons name="lock-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              placeholder="Re-enter password"
+              placeholderTextColor={colors.textMuted}
+              value={confirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                if (signupError) setSignupError(null);
+              }}
+              secureTextEntry={!showConfirmPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+              <MaterialIcons 
+                name={showConfirmPassword ? "visibility" : "visibility-off"} 
+                size={20} 
+                color={colors.textMuted}
+              />
+            </TouchableOpacity>
+          </View>
+          {signupError && (
+            <Text style={styles.errorText}>{signupError}</Text>
+          )}
+        </View>
+
         <TouchableOpacity 
           style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
           onPress={handleSignup}
@@ -291,16 +459,7 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
           )}
         </TouchableOpacity>
 
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <TouchableOpacity style={styles.googleButton} onPress={handleGoogleSignIn}>
-          <MaterialIcons name="g-translate" size={20} color={colors.text} />
-          <Text style={styles.googleButtonText}>Continue with Google</Text>
-        </TouchableOpacity>
+        {/* Google Sign-In removed */}
 
         <View style={styles.switchMode}>
           <Text style={styles.switchModeText}>Already have an account? </Text>
@@ -322,26 +481,29 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
   }
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { flexDirection: isMobile ? 'column' : 'row', alignItems: 'stretch' }]}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        <View style={styles.leftSection}>
-          <View style={styles.brandSection}>
-            <View style={styles.logoContainer}>
-              <MaterialIcons name="school" size={48} color={colors.primary} />
+        {/* Left / Brand panel: hidden on mobile */}
+        {!isMobile && (
+          <View style={styles.leftSection}>
+            <View style={styles.brandSection}>
+              <View style={styles.logoContainer}>
+                <MaterialIcons name="school" size={48} color={colors.primary} />
+              </View>
+              <Text style={styles.brandTitle}>Unlock Your Potential</Text>
+              <Text style={styles.brandSubtitle}>
+                Elevate your learning experience with our innovative AI-powered study tools and resources to support your growth.
+              </Text>
             </View>
-            <Text style={styles.brandTitle}>Unlock Your Potential</Text>
-            <Text style={styles.brandSubtitle}>
-              Elevate your learning experience with our innovative AI-powered study tools and resources to support your growth.
-            </Text>
           </View>
-        </View>
+        )}
 
         <View style={styles.rightSection}>
           {mode === 'login' ? renderLogin() : renderSignup()}
@@ -358,7 +520,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    flexDirection: isWeb && width > 768 ? 'row' : 'column',
   },
   leftSection: {
     flex: 1,
@@ -405,6 +566,24 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
   },
+  formContainerMobile: {
+    maxWidth: '100%',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  mobileLogoContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  logoCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#E8F2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.md,
+  },
   title: {
     fontSize: 28,
     fontWeight: '700',
@@ -448,6 +627,12 @@ const styles = StyleSheet.create({
     padding: 0,
     height: 24,
   },
+  errorText: {
+    fontSize: 12,
+    color: '#EF4444', // red-500
+    marginTop: spacing.xs,
+    fontWeight: '500',
+  },
   forgotPassword: {
     alignSelf: 'flex-end',
     marginBottom: spacing.lg,
@@ -490,40 +675,24 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginHorizontal: spacing.md,
   },
-  googleButton: {
+  /* Google button removed */
+  guestButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.primary,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.md,
-    marginBottom: spacing.lg,
-    ...shadows.sm,
-  },
-  googleButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
-  },
-  guestButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+    minHeight: 48,
   },
   guestButtonText: {
     fontSize: 16,
-    fontWeight: '500',
-    color: colors.textMuted,
+    fontWeight: '600',
+    color: colors.primary,
   },
   switchMode: {
     flexDirection: 'row',

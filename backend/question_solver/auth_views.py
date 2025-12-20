@@ -335,6 +335,11 @@ class UserProfileView(APIView):
             payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm])
             
             user = User.objects.get(id=payload['user_id'])
+            
+            # Get user coins
+            from .models import UserCoins
+            user_coins = UserCoins.objects.filter(user=user).first()
+            total_coins = user_coins.total_coins if user_coins else 0
 
             return Response({
                 'success': True,
@@ -345,6 +350,7 @@ class UserProfileView(APIView):
                     'first_name': user.first_name,
                     'last_name': user.last_name,
                     'date_joined': user.date_joined.isoformat(),
+                    'coins': total_coins,
                 }
             }, status=status.HTTP_200_OK)
 

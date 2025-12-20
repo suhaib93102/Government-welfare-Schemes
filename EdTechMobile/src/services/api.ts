@@ -228,7 +228,10 @@ export const generateFlashcards = async (
         } as any;
         formData.append('document', documentFile);
       }
-    } else {
+    }
+    
+    // Always append topic (can be empty string if document is provided)
+    if (topic) {
       formData.append('topic', topic);
     }
     
@@ -538,8 +541,9 @@ export const loginUser = async (usernameOrEmail: string, password: string) => {
   try {
     // Try to detect email format
     const payload: any = { password };
-    if (usernameOrEmail.includes('@')) payload.email = usernameOrEmail;
-    else payload.username = usernameOrEmail;
+    const identifier = (usernameOrEmail || '').trim();
+    if (identifier.includes('@')) payload.email = identifier.toLowerCase();
+    else payload.username = identifier;
 
     const response = await api.post('/auth/login/', payload);
     const data = response.data;
@@ -662,5 +666,28 @@ export const getQuizHistory = async (userId: string, limit: number = 30) => {
   }
 };
 
-export default api;
+export const getDailyQuizAttempt = async (userId: string, quizId: string) => {
+  try {
+    const response = await api.get('/daily-quiz/attempt/detail/', {
+      params: { user_id: userId, quiz_id: quizId }
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to fetch quiz attempt details');
+  }
+};
 
+/**
+ * Get user profile including coins
+ * Requires valid auth token in headers
+ */
+export const getUserProfile = async () => {
+  try {
+    const response = await api.get('/auth/profile/');
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get user profile');
+  }
+};
+
+export default api;

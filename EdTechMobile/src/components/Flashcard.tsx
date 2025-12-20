@@ -51,37 +51,38 @@ export const Flashcard: React.FC<FlashcardProps> = ({ flashcardData, loading, on
     return (
       <View style={styles.emptyContainer}>
         <View style={styles.inputCardFlash}>
-          <View style={styles.cardTabsFlash}>
-            <TouchableOpacity
-              style={[styles.cardTabFlash, styles.cardTabLeftFlash, activeMethod === 'text' && styles.cardTabActiveFlash]}
-              onPress={() => setActiveMethod('text')}
-            >
-              <MaterialIcons name="text-fields" size={20} color={activeMethod === 'text' ? colors.white : colors.textMuted} />
-              <Text style={[styles.cardTabTextFlash, activeMethod === 'text' && styles.cardTabTextActiveFlash]}>Text Input</Text>
-            </TouchableOpacity>
+            <View style={styles.cardTabsFlash}>
+              <TouchableOpacity
+                style={[styles.cardTabFlash, styles.cardTabLeftFlash, activeMethod === 'text' && styles.cardTabActiveFlash]}
+                onPress={() => setActiveMethod('text')}
+              >
+                <MaterialIcons name="text-fields" size={20} color={activeMethod === 'text' ? colors.white : colors.textMuted} />
+                <Text style={[styles.cardTabTextFlash, activeMethod === 'text' && styles.cardTabTextActiveFlash]}>Text Input</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.cardTabFlash, styles.cardTabRightFlash, activeMethod === 'image' && styles.cardTabActiveFlash]}
-              onPress={() => setActiveMethod('image')}
-            >
-              <MaterialIcons name="image" size={18} color={activeMethod === 'image' ? colors.white : colors.textMuted} />
-              <Text style={[styles.cardTabTextFlash, activeMethod === 'image' && styles.cardTabTextActiveFlash]}>Image Upload</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                style={[styles.cardTabFlash, styles.cardTabRightFlash, activeMethod === 'image' && styles.cardTabActiveFlash]}
+                onPress={() => setActiveMethod('image')}
+              >
+                <MaterialIcons name="image" size={18} color={activeMethod === 'image' ? colors.white : colors.textMuted} />
+                <Text style={[styles.cardTabTextFlash, activeMethod === 'image' && styles.cardTabTextActiveFlash]}>Image Upload</Text>
+              </TouchableOpacity>
+            </View>
 
-          <View style={styles.cardContentFlash}>
-            {activeMethod === 'text' ? (
-              <TextInputComponent
-                onSubmit={(text) => onTextSubmit?.(text)}
-                placeholder="Enter topic for flashcards (e.g., 'Biology Cells', 'Math Formulas')..."
-              />
-            ) : (
-              <ImageUpload
-                onSubmit={(imageUri) => onImageSubmit?.(imageUri)}
-              />
-            )}
+            <View style={styles.cardContentFlash}>
+              {activeMethod === 'text' ? (
+                <TextInputComponent
+                  onSubmit={(text) => onTextSubmit?.(text)}
+                  placeholder="Enter topic for flashcards (e.g., 'Biology Cells', 'Math Formulas')..."
+                />
+              ) : (
+                <ImageUpload
+                  onSubmit={(imageUri) => onImageSubmit?.(imageUri)}
+                  loading={loading}
+                />
+              )}
+            </View>
           </View>
-        </View>
       </View>
     );
   }
@@ -554,6 +555,85 @@ const styles = StyleSheet.create({
   emptyContainer: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  screenHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  headerIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E8F2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTextContainer: {
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: colors.textMuted,
+  },
+  onlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: '#DCFCE7',
+    borderRadius: borderRadius.full,
+  },
+  onlineText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  scrollContent: {
+    paddingVertical: spacing.xl,
+  },
+  questionSection: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.xl,
+  },
+  questionIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#E8F2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  questionTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  questionSubtitle: {
+    fontSize: 15,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   tabContainer: {
     flexDirection: 'row',

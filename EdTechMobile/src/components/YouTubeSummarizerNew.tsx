@@ -49,7 +49,7 @@ export default function YouTubeSummarizerNew({ summaryData = null, loading = fal
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ alignItems: 'center' }}>
       <View style={styles.card}>
         <Text style={styles.title}>{summaryData.title}</Text>
         <Text style={styles.summary}>{summaryData.summary}</Text>
@@ -59,7 +59,7 @@ export default function YouTubeSummarizerNew({ summaryData = null, loading = fal
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, alignItems: 'center', padding: spacing.lg },
+  container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
   card: { width: '100%', maxWidth: isWeb && !isMobile ? 900 : '100%', backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.lg, ...shadows.md, alignItems: 'center' },
   headerImage: { width: 80, height: 80, marginBottom: spacing.md },
   title: { ...typography.h2, textAlign: 'center' },
@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   button: { width: '100%', backgroundColor: colors.primary, padding: spacing.md, borderRadius: borderRadius.md, flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, alignItems: 'center' as any },
   buttonDisabled: { opacity: 0.6, backgroundColor: colors.textMuted },
   buttonText: { ...typography.h4, color: colors.white, marginLeft: spacing.sm },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 20, backgroundColor: 'transparent' },
   loadingText: { ...typography.h3, color: colors.text },
   summary: { ...typography.body, color: colors.text },
 });

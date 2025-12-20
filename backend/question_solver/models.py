@@ -558,3 +558,72 @@ class PairQuizSession(models.Model):
             code = 'QZ-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
             if not PairQuizSession.objects.filter(session_code=code).exists():
                 return code
+
+
+class QuizSettings(models.Model):
+    """Global settings for quiz rewards and configurations"""
+    # Daily Quiz Coin Settings
+    daily_quiz_attempt_bonus = models.IntegerField(
+        default=5,
+        help_text="Coins awarded for starting a daily quiz"
+    )
+    daily_quiz_coins_per_correct = models.IntegerField(
+        default=5,
+        help_text="Coins awarded per correct answer in daily quiz"
+    )
+    daily_quiz_perfect_score_bonus = models.IntegerField(
+        default=10,
+        help_text="Extra bonus coins for getting 100% score"
+    )
+    
+    # Pair Quiz Settings
+    pair_quiz_enabled = models.BooleanField(
+        default=True,
+        help_text="Enable/disable pair quiz feature"
+    )
+    pair_quiz_session_timeout = models.IntegerField(
+        default=30,
+        help_text="Session expiry time in minutes"
+    )
+    pair_quiz_max_questions = models.IntegerField(
+        default=20,
+        help_text="Maximum questions allowed per quiz"
+    )
+    
+    # General Settings
+    coin_to_currency_rate = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.10,
+        help_text="Conversion rate: 1 coin = X currency"
+    )
+    min_coins_for_redemption = models.IntegerField(
+        default=100,
+        help_text="Minimum coins required for redemption"
+    )
+    
+    # Metadata
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.CharField(max_length=255, blank=True, null=True)
+    
+    class Meta:
+        verbose_name = "Quiz Settings"
+        verbose_name_plural = "Quiz Settings"
+    
+    def __str__(self):
+        return "Quiz Settings (Global Configuration)"
+    
+    @classmethod
+    def get_settings(cls):
+        """Get or create singleton settings instance"""
+        settings, created = cls.objects.get_or_create(pk=1)
+        return settings
+    
+    def save(self, *args, **kwargs):
+        # Ensure only one instance exists
+        self.pk = 1
+        super().save(*args, **kwargs)
+    
+    def delete(self, *args, **kwargs):
+        # Prevent deletion
+        pass

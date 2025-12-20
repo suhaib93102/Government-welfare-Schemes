@@ -78,54 +78,54 @@ export const PredictedQuestions: React.FC<PredictedQuestionsProps> = ({ predicte
 
   if (!predictedQuestionsData) {
     return (
-      <ScrollView style={styles.emptyContainer} contentContainerStyle={styles.emptyContentContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerSection}>
-          <Image 
-            source={require('../../assets/Sitting Boy.png')} 
-            style={{ width: 80, height: 80, marginBottom: spacing.lg }}
-            resizeMode="contain"
-          />
-          <Text style={styles.headerTitle}>Predicted Important Questions</Text>
-          <Text style={styles.headerSubtitle}>
-            AI-powered predictions of likely exam questions based on importance and difficulty patterns
-          </Text>
-        </View>
-
-        <View style={styles.inputCard}>
-          <View style={styles.cardTabs}>
-            <TouchableOpacity
-              style={[styles.cardTab, styles.cardTabLeft, activeMethod === 'text' && styles.cardTabActive]}
-              onPress={() => setActiveMethod('text')}
-            >
-              <MaterialIcons name="text-fields" size={20} color={activeMethod === 'text' ? colors.white : colors.textMuted} />
-              <Text style={[styles.cardTabText, activeMethod === 'text' && styles.cardTabTextActive]}>Text Input</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.cardTab, activeMethod === 'file' && styles.cardTabActive, styles.cardTabRight]}
-              onPress={() => setActiveMethod('file')}
-            >
-              <MaterialIcons name="upload-file" size={18} color={activeMethod === 'file' ? colors.white : colors.textMuted} />
-              <Text style={[styles.cardTabText, activeMethod === 'file' && styles.cardTabTextActive]}>Document Upload</Text>
-            </TouchableOpacity>
+      <View style={styles.emptyContainer}>
+        <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.emptyContentContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.questionSection}>
+            <View style={styles.questionIcon}>
+              <MaterialIcons name="help" size={48} color={colors.primary} />
+            </View>
+            <Text style={styles.questionTitle}>Get Prediction of Questions and Concepts </Text>
+            <Text style={styles.questionSubtitle}>
+              Get instant AI-powered answers with step-by-step explanations
+            </Text>
           </View>
 
-          <View style={styles.cardContent}>
-            {activeMethod === 'text' ? (
-              <TextInputComponent
-                onSubmit={(text) => onTextSubmit?.(text)}
-                placeholder="Paste your study material, notes, or topic content here..."
-              />
-            ) : (
-              <FileUpload
-                onSubmit={(files) => onFileSubmit?.(files)}
-                loading={loading}
-                placeholder="Upload syllabus/notes to predict important questions"
-              />
-            )}
+          <View style={styles.inputCard}>
+            <View style={styles.cardTabs}>
+              <TouchableOpacity
+                style={[styles.cardTab, styles.cardTabLeft, activeMethod === 'text' && styles.cardTabActive]}
+                onPress={() => setActiveMethod('text')}
+              >
+                <MaterialIcons name="text-fields" size={20} color={activeMethod === 'text' ? colors.white : colors.textMuted} />
+                <Text style={[styles.cardTabText, activeMethod === 'text' && styles.cardTabTextActive]}>Text Input</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.cardTab, activeMethod === 'file' && styles.cardTabActive, styles.cardTabRight]}
+                onPress={() => setActiveMethod('file')}
+              >
+                <MaterialIcons name="upload-file" size={18} color={activeMethod === 'file' ? colors.white : colors.textMuted} />
+                <Text style={[styles.cardTabText, activeMethod === 'file' && styles.cardTabTextActive]}>Document Upload</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.cardContent}>
+              {activeMethod === 'text' ? (
+                <TextInputComponent
+                  onSubmit={(text) => onTextSubmit?.(text)}
+                  placeholder="Paste your study material, notes, or topic content here..."
+                />
+              ) : (
+                <FileUpload
+                  onSubmit={(files) => onFileSubmit?.(files)}
+                  loading={loading}
+                  placeholder="Upload syllabus/notes to predict important questions"
+                />
+              )}
+            </View>
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
     );
   }
 
@@ -235,7 +235,7 @@ export const PredictedQuestions: React.FC<PredictedQuestionsProps> = ({ predicte
           >
             <MaterialIcons name={showDefinitions ? 'expand-less' : 'expand-more'} size={24} color={colors.primary} />
             <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>📚 Key Definitions & Concepts</Text>
+              <Text style={styles.sectionTitle}>Key Definitions & Concepts</Text>
               <Text style={styles.sectionSubtitle}>{predictedQuestionsData.key_definitions.length} essential terms</Text>
             </View>
           </TouchableOpacity>
@@ -318,7 +318,7 @@ export const PredictedQuestions: React.FC<PredictedQuestionsProps> = ({ predicte
         <View style={styles.sectionHeader}>
           <MaterialIcons name="help-outline" size={24} color={colors.primary} />
           <View style={styles.sectionHeaderText}>
-            <Text style={styles.sectionTitle}>❓ Predicted Important Questions</Text>
+            <Text style={styles.sectionTitle}> Predicted Important Questions</Text>
             <Text style={styles.sectionSubtitle}>Questions likely to appear in {predictedQuestionsData.exam_type} exams</Text>
           </View>
         </View>
@@ -400,7 +400,7 @@ export const PredictedQuestions: React.FC<PredictedQuestionsProps> = ({ predicte
               <View style={styles.detailsContainer}>
                 {question.sample_answer && (
                   <View style={styles.answerBox}>
-                    <Text style={styles.answerTitle}>📝 Sample Answer:</Text>
+                    <Text style={styles.answerTitle}>Sample Answer:</Text>
                     <Text style={styles.answerText}>{question.sample_answer}</Text>
                   </View>
                 )}
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    paddingTop: 20,
     backgroundColor: 'transparent',
     minHeight: 400,
   },
@@ -917,8 +917,88 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 20,
+    backgroundColor: 'transparent',
+    minHeight: 400,
+  },
   emptyContentContainer: {
     paddingBottom: spacing.xxxl,
+  },
+  screenHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  headerIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E8F2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTextContainer: {
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  onlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: '#DCFCE7',
+    borderRadius: borderRadius.full,
+  },
+  onlineText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  questionSection: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+  },
+  questionIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#E8F2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  questionTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  questionSubtitle: {
+    fontSize: 15,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   headerSection: {
     alignItems: 'center',
@@ -926,14 +1006,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     backgroundColor: colors.white,
     marginBottom: spacing.md,
-  },
-  headerTitle: {
-    ...typography.h1,
-    fontSize: 26,
-    color: colors.text,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-    fontWeight: '700',
   },
   headerSubtitle: {
     ...typography.body,

@@ -140,15 +140,6 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <MaterialIcons name="close" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Reset Password</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
       {/* Content */}
       {step === 'request' && !initialToken ? (
         <View style={styles.content}>
@@ -325,43 +316,30 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.lg,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  closeButton: {
-    padding: spacing.sm,
-  },
-  headerSpacer: {
-    width: 40,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
+    maxWidth: 400,
+    width: '100%',
+    alignSelf: 'center',
   },
   iconSection: {
     alignItems: 'center',
-    marginVertical: spacing.lg,
+    marginVertical: spacing.xl,
   },
   iconCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.lightGray,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#E8F2FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     color: colors.text,
     marginBottom: spacing.sm,
@@ -371,7 +349,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textMuted,
     textAlign: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
     lineHeight: 20,
   },
   formGroup: {
@@ -379,25 +357,27 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
     color: colors.text,
     marginBottom: spacing.sm,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.lightGray,
+    backgroundColor: '#F8F9FA',
     borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.white,
+    paddingVertical: spacing.sm,
   },
   input: {
     flex: 1,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
     fontSize: 14,
     color: colors.text,
+    height: 24,
   },
   button: {
     paddingVertical: spacing.md,
@@ -406,6 +386,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
+    minHeight: 48,
   },
   primaryButton: {
     backgroundColor: colors.primary,
@@ -439,7 +420,7 @@ const styles = StyleSheet.create({
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.lightGray,
+    backgroundColor: '#FEE2E2',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.sm,

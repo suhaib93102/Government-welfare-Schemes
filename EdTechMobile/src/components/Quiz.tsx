@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
 import AnimatedLoader from './AnimatedLoader';
@@ -40,6 +40,9 @@ export const Quiz: React.FC<QuizProps> = ({ quizData, loading }) => {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [timerStarted, setTimerStarted] = useState(false);
 
+  const { width, height } = Dimensions.get('window');
+  const isSmallDevice = width < 360 || height < 700;
+
   // Initialize timer when quiz data is loaded
   useEffect(() => {
     if (quizData && !timerStarted) {
@@ -78,6 +81,10 @@ export const Quiz: React.FC<QuizProps> = ({ quizData, loading }) => {
       </View>
     );
   }
+
+  // Responsive wrappers to avoid overlap on small screens
+  const questionContainerStyle = [styles.questionContainer, isSmallDevice && styles.questionContainerSmall];
+  const optionsContainerStyle = [styles.optionsContainer, isSmallDevice && styles.optionsContainerSmall];
 
   if (!quizData) {
     return (
@@ -511,7 +518,7 @@ export const Quiz: React.FC<QuizProps> = ({ quizData, loading }) => {
         </View>
       </View>
 
-      <View style={styles.questionContainer}>
+      <View style={questionContainerStyle}>
         <Text style={styles.questionText}>{question.question}</Text>
         {question.difficulty && (
           <View style={styles.questionMetadata}>
@@ -532,7 +539,7 @@ export const Quiz: React.FC<QuizProps> = ({ quizData, loading }) => {
         )}
       </View>
 
-      <View style={styles.optionsContainer}>
+      <View style={optionsContainerStyle}>
         {question.options.map((option, index) => {
           const isSelected = userAnswers.get(currentQuestion) === index;
 
@@ -542,10 +549,11 @@ export const Quiz: React.FC<QuizProps> = ({ quizData, loading }) => {
               style={[
                 styles.optionButton,
                 isSelected && styles.optionSelected,
+                isSmallDevice && styles.optionButtonSmall,
               ]}
               onPress={() => handleAnswerSelect(index)}
             >
-              <View style={styles.optionContent}>
+              <View style={[styles.optionContent, isSmallDevice && styles.optionContentSmall]}>
                 <Text style={[
                   styles.optionLetter,
                   isSelected && styles.optionLetterSelected
@@ -567,9 +575,9 @@ export const Quiz: React.FC<QuizProps> = ({ quizData, loading }) => {
         })}
       </View>
 
-      <View style={styles.navigationContainer}>
+      <View style={[styles.navigationContainer, isSmallDevice && styles.navigationContainerSmall]}>
         <TouchableOpacity
-          style={[styles.navButton, currentQuestion === 0 && styles.navButtonDisabled]}
+          style={[styles.navButton, currentQuestion === 0 && styles.navButtonDisabled, isSmallDevice && styles.navButtonSmall]}
           onPress={handlePrevious}
           disabled={currentQuestion === 0}
         >
@@ -581,7 +589,7 @@ export const Quiz: React.FC<QuizProps> = ({ quizData, loading }) => {
 
         {currentQuestion === quizData.questions.length - 1 ? (
           <TouchableOpacity
-            style={[styles.navButton, styles.submitButton]}
+            style={[styles.navButton, styles.submitButton, isSmallDevice && styles.navButtonSmall]}
             onPress={handleSubmitQuiz}
           >
             <Text style={[styles.navButtonText, styles.submitButtonText]}>
@@ -591,7 +599,7 @@ export const Quiz: React.FC<QuizProps> = ({ quizData, loading }) => {
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[styles.navButton, styles.nextButton]}
+            style={[styles.navButton, styles.nextButton, isSmallDevice && styles.navButtonSmall]}
             onPress={handleNext}
           >
             <Text style={[styles.navButtonText, styles.nextButtonText]}>
@@ -722,6 +730,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.md,
     gap: spacing.md,
+    flexWrap: 'wrap',
+  },
+  optionContentSmall: {
+    padding: spacing.sm,
+  },
+  optionButtonSmall: {
+    paddingVertical: spacing.xs,
   },
   optionLetter: {
     ...typography.h4,
@@ -736,6 +751,22 @@ const styles = StyleSheet.create({
     ...typography.body,
     flex: 1,
     color: colors.text,
+    flexShrink: 1,
+  },
+  navButtonSmall: {
+    minWidth: 120,
+    marginTop: spacing.sm,
+  },
+  navigationContainerSmall: {
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
+  questionContainerSmall: {
+    padding: spacing.md,
+  },
+  optionsContainerSmall: {
+    padding: spacing.sm,
+    gap: spacing.sm,
   },
   optionTextActive: {
     fontWeight: '600',
@@ -802,17 +833,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.xl * 2,
     height: 200,
+    width: '100%',
   },
   barWrapper: {
     alignItems: 'center',
     justifyContent: 'flex-end',
-    width: 80,
+    flex: 1,
+    maxWidth: 120,
     height: '100%',
   },
   bar: {
     width: '100%',
+    maxWidth: 80,
     borderRadius: borderRadius.md,
-    minHeight: 20,
+    minHeight: 30,
+    alignSelf: 'center',
     ...shadows.sm,
   },
   correctBar: {

@@ -17,6 +17,7 @@ import { colors, spacing, borderRadius, typography, shadows } from '../styles/th
 import { getDailyQuiz, submitDailyQuiz, startDailyQuiz, getUserCoins } from '../services/api';
 import { getDailyQuizQuestions } from '../services/mockTestService';
 import LoadingWebm from './LoadingWebm';
+import { DailyQuizResults } from './DailyQuizResults';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -41,6 +42,7 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [quizState, setQuizState] = useState<'not-started' | 'started' | 'completed'>('not-started');
   const [results, setResults] = useState<any>(null);
+  const [showDetailedResults, setShowDetailedResults] = useState<boolean>(false);
   const [startTime] = useState(Date.now());
   const [fadeAnim] = useState(new Animated.Value(0));
   const [coinAnim] = useState(new Animated.Value(0));
@@ -57,6 +59,11 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
     }
     return String(value);
   };
+
+  // helper for closing results modal from results component
+  useEffect(() => {
+    if (!showDetailedResults) return;
+  }, [showDetailedResults]);
 
   useEffect(() => {
     // initial load
@@ -251,11 +258,13 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
         }
         
         resultsDetails.push({
-          question_id: idx,
+          question_id: idx + 1,
           question: question.question,
           options: question.options,
-          user_answer: question.options[userAnswer] || 'No answer',
-          correct_answer: question.options[correctAnswer] || 'Unknown',
+          user_answer_index: userAnswer,
+          correct_answer_index: correctAnswer,
+          user_answer: question.options?.[userAnswer] ?? 'No answer',
+          correct_answer: question.options?.[correctAnswer] ?? 'Unknown',
           is_correct: isCorrect,
           explanation: question.explanation || 'No explanation available',
           fun_fact: question.fun_fact || '',
@@ -279,11 +288,24 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
           attempt_bonus: attemptBonus,
           per_correct: perCorrectCoins,
           results: resultsDetails,
+          coin_breakdown: {
+            attempt_bonus: attemptBonus,
+            correct_answers: correctCount,
+            correct_answer_coins: coinsFromCorrect,
+            total_earned: totalCoinsEarned,
+          },
         },
         correct_count: correctCount,
         total_questions: totalQuestions,
         score_percentage: scorePercentage,
         coins_earned: totalCoinsEarned,
+        results: resultsDetails,
+        coin_breakdown: {
+          attempt_bonus: attemptBonus,
+          correct_answers: correctCount,
+          correct_answer_coins: coinsFromCorrect,
+          total_earned: totalCoinsEarned,
+        },
       };
       
       console.log('Quiz completed locally, result:', result);
@@ -334,8 +356,8 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
             <View>
               <Text style={styles.profileCoinsLabel}>Total Coins</Text>
               <View style={styles.profileCoinsRow}>
-                <MaterialIcons name="monetization-on" size={18} color={colors.primary} />
-                <Text style={styles.profileCoinsText}>{userCoins}</Text>
+                <Image source={require('../../assets/coins.png')} style={{ width: 20, height: 20 }} resizeMode="contain" />
+                <Text style={styles.profileCoinsText}>{userCoins + (results.result?.coins_earned || results.coins_earned || 0)}</Text>
               </View>
             </View>
           </View>
@@ -375,23 +397,32 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
             {results.coin_breakdown && (
               <View style={styles.coinBreakdown}>
                 <View style={styles.coinBreakdownRow}>
-                  <Text style={styles.coinBreakdownLabel}>🎯 Attempt Bonus:</Text>
+                  <View style={styles.coinBreakdownLabelWithIcon}>
+                    <MaterialIcons name="stars" size={20} color="#F59E0B" />
+                    <Text style={styles.coinBreakdownLabel}>Attempt Bonus:</Text>
+                  </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
                     <Text style={styles.coinBreakdownValue}>+{results.coin_breakdown.attempt_bonus}</Text>
                     <Image source={require('../../assets/coins.png')} style={{ width: 18, height: 18, marginLeft: spacing.xs }} />
                   </View>
                 </View>
                 <View style={styles.coinBreakdownRow}>
-                  <Text style={styles.coinBreakdownLabel}>
-                    ✅ Correct Answers ({results.coin_breakdown.correct_answers}):
-                  </Text>
+                  <View style={styles.coinBreakdownLabelWithIcon}>
+                    <MaterialIcons name="verified" size={20} color="#10B981" />
+                    <Text style={styles.coinBreakdownLabel}>
+                      Correct Answers ({results.coin_breakdown.correct_answers}):
+                    </Text>
+                  </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
                     <Text style={styles.coinBreakdownValue}>+{results.coin_breakdown.correct_answer_coins}</Text>
                     <Image source={require('../../assets/coins.png')} style={{ width: 18, height: 18, marginLeft: spacing.xs }} />
                   </View>
                 </View>
                 <View style={[styles.coinBreakdownRow, styles.coinBreakdownTotal]}>
-                  <Text style={styles.coinBreakdownTotalLabel}>Total:</Text>
+                  <View style={styles.coinBreakdownLabelWithIcon}>
+                    <MaterialIcons name="emoji-events" size={20} color="#8B5CF6" />
+                    <Text style={styles.coinBreakdownTotalLabel}>Total:</Text>
+                  </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' }}>
                     <Text style={styles.coinBreakdownTotalValue}>{results.coin_breakdown.total_earned}</Text>
                     <Image source={require('../../assets/coins.png')} style={{ width: 18, height: 18, marginLeft: spacing.xs }} />
@@ -405,17 +436,23 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
             <Text style={styles.sectionTitle}>Performance</Text>
             <View style={styles.statsRow}>
               <View style={styles.statBox}>
-                <MaterialIcons name="check-circle" size={32} color={colors.success} />
+                <View style={styles.statIconCircle}>
+                  <MaterialIcons name="verified" size={28} color={colors.success} />
+                </View>
                 <Text style={styles.statNumber}>{results.result?.correct_count || results.correct_count}</Text>
                 <Text style={styles.statText}>Correct</Text>
               </View>
               <View style={styles.statBox}>
-                <MaterialIcons name="quiz" size={32} color={colors.primary} />
+                <View style={[styles.statIconCircle, { backgroundColor: colors.primaryLight }]}>
+                  <MaterialIcons name="quiz" size={28} color={colors.primary} />
+                </View>
                 <Text style={styles.statNumber}>{results.result?.total_questions || results.total_questions}</Text>
                 <Text style={styles.statText}>Total</Text>
               </View>
               <View style={styles.statBox}>
-                <MaterialIcons name="percent" size={32} color={colors.warning} />
+                <View style={[styles.statIconCircle, { backgroundColor: colors.warningLight }]}>
+                  <MaterialIcons name="grade" size={28} color={colors.warning} />
+                </View>
                 <Text style={styles.statNumber}>
                   {Math.round(results.result?.score_percentage || results.score_percentage || 0)}%
                 </Text>
@@ -481,6 +518,14 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
           )}
 
           <TouchableOpacity
+            style={styles.viewDetailedButton}
+            onPress={() => setShowDetailedResults(true)}
+          >
+            <MaterialIcons name="article" size={18} color={colors.primary} />
+            <Text style={styles.viewDetailedButtonText}>View Detailed Results</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.doneButton}
             onPress={() => {
               onComplete();
@@ -490,6 +535,19 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
             <Text style={styles.doneButtonText}>Done</Text>
           </TouchableOpacity>
         </ScrollView>
+
+        {showDetailedResults && (
+          <View style={styles.resultsModal}>
+            <View style={styles.resultsModalContent}>
+              <DailyQuizResults
+                userId={userId || 'anonymous'}
+                quizId={quizData?.quiz_id || quizData?.quiz_id}
+                initialResults={results}
+                onClose={() => setShowDetailedResults(false)}
+              />
+            </View>
+          </View>
+        )}
       </View>
     );
   }
@@ -1073,7 +1131,13 @@ const styles = StyleSheet.create({
   coinBreakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: spacing.xs,
+  },
+  coinBreakdownLabelWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   coinBreakdownLabel: {
     ...typography.body,
@@ -1118,6 +1182,15 @@ const styles = StyleSheet.create({
   statBox: {
     alignItems: 'center',
     gap: spacing.xs,
+  },
+  statIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.successLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
   },
   statNumber: {
     ...typography.h2,
@@ -1223,6 +1296,24 @@ const styles = StyleSheet.create({
     flex: 1,
     fontStyle: 'italic',
   },
+  viewDetailedButton: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    marginTop: spacing.md,
+    gap: spacing.xs,
+  },
+  viewDetailedButtonText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 15,
+  },
   doneButton: {
     backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
@@ -1237,6 +1328,24 @@ const styles = StyleSheet.create({
   doneButtonText: {
     ...typography.h4,
     color: colors.white,
+  },
+  resultsModal: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  resultsModalContent: {
+    width: isWeb && width > 900 ? 900 : '95%',
+    maxHeight: '85%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   coinInfo: {
     flexDirection: 'row',

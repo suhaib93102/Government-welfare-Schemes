@@ -35,12 +35,13 @@ import { MainDashboard } from './src/components/MainDashboard';
 import { TrendAnalysis } from './src/components/TrendAnalysis';
 import { getUserCoins } from './src/services/api';
 import { DailyQuizScreen } from './src/components/DailyQuizScreen';
+import { PairQuizContainer } from './src/components/pair-quiz';
 import { solveQuestionByText, solveQuestionByImage, checkHealth, generateQuiz, generateFlashcards, generateStudyMaterial, summarizeYouTubeVideo, generatePredictedQuestions } from './src/services/api';
 import { generateMockTest } from './src/services/mockTestService';
 import { colors, spacing, borderRadius, typography, shadows } from './src/styles/theme';
 
 type TabType = 'text' | 'image';
-type PageType = 'dashboard' | 'mock-test' | 'quiz' | 'flashcards' | 'ask' | 'predicted-questions' | 'youtube-summarizer' | 'pricing' | 'profile' | 'trends' | 'daily-quiz';
+type PageType = 'dashboard' | 'mock-test' | 'quiz' | 'flashcards' | 'ask' | 'predicted-questions' | 'youtube-summarizer' | 'pricing' | 'profile' | 'trends' | 'daily-quiz' | 'pair-quiz';
 type DashboardSection = 'overview' | 'quiz' | 'flashcards' | 'study-material';
 type AppScreenType = 'auth' | 'landing' | 'main';
 
@@ -61,6 +62,7 @@ const isWeb = Platform.OS === 'web';
   const navItems = [
   { id: 'mock-test' as PageType, label: 'Mock Test', icon: 'quiz' },
   { id: 'quiz' as PageType, label: 'Quiz', icon: 'school' },
+  { id: 'pair-quiz' as PageType, label: 'Pair Quiz', icon: 'people' },
   { id: 'flashcards' as PageType, label: 'Flashcards', icon: 'style' },
   { id: 'ask' as PageType, label: 'Ask Question', icon: 'help' },
   { id: 'predicted-questions' as PageType, label: 'Predicted Questions', icon: 'psychology' },
@@ -975,9 +977,9 @@ export default function App() {
           </ScrollView>
         </View>
       ) : currentPage === 'youtube-summarizer' ? (
-        <View style={{ flex: 1, padding: spacing.lg }}>
-          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-            <View style={styles.sectionContainer}>
+        <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+          <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', paddingVertical: spacing.xl }}>
+            <View style={[styles.sectionContainer, { width: '100%', maxWidth: 900, alignItems: 'center' }]}>
               <YouTubeSummarizer 
                 summaryData={youtubeSummaryData} 
                 loading={youtubeSummaryLoading}
@@ -1073,6 +1075,10 @@ export default function App() {
       ) : currentPage === 'pricing' ? (
         <View style={{ flex: 1 }}>
           <Pricing />
+        </View>
+      ) : currentPage === 'pair-quiz' ? (
+        <View style={{ flex: 1 }}>
+          <PairQuizContainer onExit={() => setCurrentPage('ask')} />
         </View>
       ) : currentPage === 'daily-quiz' ? (
         <View style={{ flex: 1 }}>

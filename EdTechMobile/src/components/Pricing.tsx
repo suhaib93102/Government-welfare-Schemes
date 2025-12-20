@@ -13,7 +13,6 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../styles/theme';
 
-const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
 
 interface Feature {
@@ -44,8 +43,19 @@ export const Pricing: React.FC = () => {
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<string>('scholar');
   const [hoveredPlan, setHoveredPlan] = useState<string | null>(null);
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
 
+  const { width } = dimensions;
   const isLarge = isWeb && width >= 900;
+  const isMobile = width < 768 && !isWeb;
+
+  // Dynamic card width based on screen size
+  const getCardWidth = () => {
+    if (isWeb) return 320; // Fixed width for web
+    if (width >= 768) return width * 0.8; // Tablet
+    if (width >= 480) return width * 0.85; // Large mobile
+    return width * 0.9; // Small mobile
+  };
 
   const plans: PricingPlan[] = [
     {
@@ -134,11 +144,17 @@ export const Pricing: React.FC = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setDimensions(window);
+    });
+
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
       useNativeDriver: true,
     }).start();
+
+    return () => subscription?.remove?.();
   }, []);
 
   const handleHoverIn = (id: string) => {
@@ -172,9 +188,9 @@ export const Pricing: React.FC = () => {
       </Animated.View>
 
       {/* Pricing Cards */}
-      <View style={styles.cardsWrapper}>
+      <View style={[styles.cardsWrapper, { paddingHorizontal: isMobile ? 16 : 24 }]}>
         {isLarge ? (
-          <View style={styles.cardsGrid}>
+          <View style={[styles.cardsGrid, { paddingHorizontal: isMobile ? 16 : 24 }]}>
             {plans.map((plan) => (
               <Animated.View
                 key={plan.id}
@@ -183,6 +199,12 @@ export const Pricing: React.FC = () => {
                   if (plan.highlighted || selectedPlan === plan.id) transforms.push({ translateY: -6 });
                   return [
                     styles.card,
+                    {
+                      flex: isWeb ? 1 : undefined,
+                      width: isWeb ? undefined : getCardWidth(),
+                      padding: isWeb ? 32 : isMobile ? 16 : 20,
+                      marginHorizontal: isWeb ? 12 : 8,
+                    },
                     (plan.highlighted || selectedPlan === plan.id) && styles.cardSelected,
                     hoveredPlan === plan.id && !(selectedPlan === plan.id) && styles.cardHover,
                     { transform: transforms, opacity: fadeAnim, cursor: isWeb ? 'pointer' : undefined },
@@ -210,12 +232,12 @@ export const Pricing: React.FC = () => {
                 )}
 
                 <View style={styles.cardHeader}>
-                  <Text style={styles.planName}>{plan.name}</Text>
+                  <Text style={[styles.planName, isMobile && styles.planNameMobile]}>{plan.name}</Text>
                   <Text style={styles.planDesc}>{plan.description}</Text>
                 </View>
 
                 <View style={styles.priceRow}>
-                  <Text style={styles.price}>{plan.price}</Text>
+                  <Text style={[styles.price, isMobile && styles.priceMobile]}>{plan.price}</Text>
                   <Text style={styles.period}>{plan.period}</Text>
                 </View>
 
@@ -260,8 +282,9 @@ export const Pricing: React.FC = () => {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.cardsContainer}
-            snapToInterval={isWeb ? 360 : width * 0.85}
+            snapToInterval={getCardWidth() + spacing.lg}
             decelerationRate="fast"
+            snapToAlignment="start"
           >
             {plans.map((plan) => (
               <Animated.View
@@ -271,6 +294,11 @@ export const Pricing: React.FC = () => {
                   if (plan.highlighted || selectedPlan === plan.id) transforms.push({ translateY: -6 });
                   return [
                     styles.card,
+                    {
+                      width: getCardWidth(),
+                      padding: isMobile ? 16 : 20,
+                      marginHorizontal: 8,
+                    },
                     (plan.highlighted || selectedPlan === plan.id) && styles.cardHighlighted,
                     hoveredPlan === plan.id && ! (selectedPlan === plan.id) && styles.cardHover,
                     { transform: transforms, opacity: fadeAnim, cursor: isWeb ? 'pointer' : undefined },
@@ -298,12 +326,12 @@ export const Pricing: React.FC = () => {
                 )}
 
                 <View style={styles.cardHeader}>
-                  <Text style={styles.planName}>{plan.name}</Text>
+                  <Text style={[styles.planName, isMobile && styles.planNameMobile]}>{plan.name}</Text>
                   <Text style={styles.planDesc}>{plan.description}</Text>
                 </View>
 
                 <View style={styles.priceRow}>
-                  <Text style={styles.price}>{plan.price}</Text>
+                  <Text style={[styles.price, isMobile && styles.priceMobile]}>{plan.price}</Text>
                   <Text style={styles.period}>{plan.period}</Text>
                 </View>
 
@@ -440,38 +468,44 @@ const styles = StyleSheet.create({
   },
   cardsWrapper: {
     marginVertical: 40,
+    paddingHorizontal: 16, // Will be overridden by inline styles
   },
   cardsContainer: {
     paddingHorizontal: 24,
     gap: 20,
-    flexDirection: isWeb ? 'row' : 'row',
-    justifyContent: isWeb ? 'space-between' : 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
     alignItems: 'stretch',
+    paddingRight: 32, // Extra padding for last card
   },
   cardsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'stretch',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16, // Will be overridden by inline styles
     gap: 20,
   },
   // Make cards stretch and occupy available width on large screens
   card: {
-    flex: isWeb ? 1 : undefined,
-    maxWidth: isWeb ? 420 : undefined,
-    // width handled by flex/maxWidth for full-width layout
+    // allow cards to expand fully on web by removing maxWidth constraint
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 32,
-    marginRight: 16,
     borderWidth: 2,
     borderColor: '#E5E7EB',
-    marginHorizontal: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    overflow: 'hidden',
+    // Platform-specific shadow styles
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 4,
+      },
+    }),
   },
   cardHighlighted: {
     borderColor: colors.primary,
@@ -497,10 +531,8 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -6 } as any],
   },
   badge: {
-    position: 'absolute',
-    top: -12,
-    left: '50%',
-    transform: [{ translateX: -55 }],
+    alignSelf: 'center',
+    marginTop: -12,
     backgroundColor: colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 6,
@@ -522,6 +554,9 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 4,
   },
+  planNameMobile: {
+    fontSize: 20,
+  },
   planDesc: {
     fontSize: 14,
     color: '#6B7280',
@@ -536,13 +571,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
   },
+  priceMobile: {
+    fontSize: 36,
+  },
   period: {
     fontSize: 16,
     color: '#6B7280',
     marginLeft: 4,
   },
   cta: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     borderWidth: 2,
     borderColor: colors.primary,
     borderRadius: 8,

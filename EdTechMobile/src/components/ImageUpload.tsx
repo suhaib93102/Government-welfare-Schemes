@@ -78,21 +78,15 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ onSubmit, loading }) =
     <View style={styles.container}>
       {!imageUri ? (
         <View style={styles.dropzone}>
-          <MaterialIcons name="cloud-upload" size={64} color={colors.primary} />
+          <MaterialIcons name="cloud-upload" size={80} color={colors.primary} />
           <Text style={styles.dropzoneTitle}>Upload Question Image</Text>
           <Text style={styles.dropzoneHint}>
-            Drop problem photos and let OCR do the rest
+            Drop problem photos and let{'\n'}OCR do the rest
           </Text>
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
-              <MaterialIcons name="photo-library" size={20} color={colors.white} />
-              <Text style={styles.uploadButtonText}>Choose File</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.uploadButton} onPress={takePicture}>
-              <MaterialIcons name="camera-alt" size={20} color={colors.white} />
-              <Text style={styles.uploadButtonText}>Take Photo</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
+            <MaterialIcons name="insert-photo" size={20} color={colors.white} />
+            <Text style={styles.uploadButtonText}>Choose File</Text>
+          </TouchableOpacity>
           <Text style={styles.supportedFormats}>Supports JPG, PNG, GIF, BMP</Text>
         </View>
       ) : (
@@ -135,29 +129,30 @@ const styles = StyleSheet.create({
   dropzone: {
     borderWidth: 2,
     borderStyle: 'dashed',
-    borderColor: colors.borderLight,
-    borderRadius: borderRadius.md,
+    borderColor: '#D1D5DB',
+    borderRadius: borderRadius.lg,
     padding: spacing.xxxl * 2,
     alignItems: 'center',
-    backgroundColor: colors.backgroundGray,
+    backgroundColor: colors.white,
   },
   dropzoneTitle: {
-    ...typography.h3,
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text,
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
   dropzoneHint: {
-    ...typography.small,
+    fontSize: 14,
+    color: colors.textMuted,
     textAlign: 'center',
     marginBottom: spacing.xl,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
+    lineHeight: 20,
   },
   uploadButton: {
+    marginBottom: spacing.lg,
     flexDirection: 'row',
+    alignSelf: 'center',
     backgroundColor: colors.primary,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
@@ -172,7 +167,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   supportedFormats: {
-    ...typography.caption,
+    fontSize: 12,
+    color: colors.textMuted,
+    textAlign: 'center',
   },
   previewContainer: {
     gap: spacing.xl,

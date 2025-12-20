@@ -60,20 +60,6 @@ export const Results: React.FC<ResultsProps> = ({ data }) => {
         </View>
       ) : null}
 
-      {confidence > 0 && (
-        <View style={styles.confidenceSection}>
-          <Text style={styles.confidenceLabel}>Confidence</Text>
-          <View
-            style={[
-              styles.confidenceBadge,
-              { backgroundColor: confidence >= 70 ? colors.success : confidence >= 40 ? '#f59e0b' : colors.error },
-            ]}
-          >
-            <Text style={styles.confidenceValue}>{Math.round(confidence)}%</Text>
-          </View>
-        </View>
-      )}
-
       {searchResults.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>

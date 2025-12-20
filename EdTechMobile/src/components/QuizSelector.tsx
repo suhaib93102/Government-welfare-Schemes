@@ -106,13 +106,10 @@ export const QuizSelector: React.FC<QuizSelectorProps> = ({
 
   const examLevels: ExamLevel[] = [
     { id: 'jee-mains', name: 'JEE', description: 'Previous Year Questions' },
-    { id: 'jee-advanced', name: 'JEE Advanced', description: 'Previous Year Questions' },
     { id: 'neet', name: 'NEET', description: 'Previous Year Questions' },
     { id: 'class-10', name: 'Class 10', description: 'CBSE Board' },
     { id: 'class-12', name: 'Class 12', description: 'CBSE Board' },
     { id: 'gate', name: 'GATE', description: 'Previous Year Questions' },
-    { id: 'cat', name: 'CAT', description: 'Previous Year Questions' },
-    { id: 'other', name: 'Other', description: 'General Practice' },
   ];
 
   const topicsByExamAndSubject: { [key: string]: { [key: string]: string[] } } = {
