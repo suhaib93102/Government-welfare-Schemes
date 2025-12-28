@@ -690,4 +690,109 @@ export const getUserProfile = async () => {
   }
 };
 
+/**
+ * COIN WITHDRAWAL APIs
+ */
+
+/**
+ * Get Razorpay public key for client-side checkout
+ */
+export const getRazorpayKey = async () => {
+  try {
+    const response = await api.get('/razorpay/key/');
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get Razorpay key');
+  }
+};
+
+/**
+ * Request coin withdrawal - Convert coins to money
+ * Conversion Rate: 10 coins = ₹1
+ * Minimum Withdrawal: 100 coins (₹10)
+ * 
+ * @param userId - User identifier
+ * @param coinsAmount - Amount of coins to withdraw (min 100)
+ * @param payoutMethod - Payment method: 'upi' or 'bank'
+ * @param accountHolderName - Account holder's name
+ * @param upiId - UPI ID (required if payoutMethod is 'upi')
+ * @param accountNumber - Bank account number (required if payoutMethod is 'bank')
+ * @param ifscCode - IFSC code (required if payoutMethod is 'bank')
+ */
+export const requestCoinWithdrawal = async (
+  userId: string,
+  coinsAmount: number,
+  payoutMethod: 'upi' | 'bank',
+  accountHolderName: string,
+  upiId?: string,
+  accountNumber?: string,
+  ifscCode?: string
+) => {
+  try {
+    const payload: any = {
+      user_id: userId,
+      coins_amount: coinsAmount,
+      payout_method: payoutMethod,
+      account_holder_name: accountHolderName,
+    };
+
+    if (payoutMethod === 'upi' && upiId) {
+      payload.upi_id = upiId;
+    } else if (payoutMethod === 'bank') {
+      if (accountNumber && ifscCode) {
+        payload.account_number = accountNumber;
+        payload.ifsc_code = ifscCode;
+      } else {
+        throw new Error('Account number and IFSC code are required for bank transfer');
+      }
+    }
+
+    const response = await api.post('/razorpay/withdraw/', payload);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to request withdrawal');
+  }
+};
+
+/**
+ * Get withdrawal history for a user
+ * @param userId - User identifier
+ */
+export const getWithdrawalHistory = async (userId: string) => {
+  try {
+    const response = await api.get('/razorpay/withdrawals/', {
+      params: { user_id: userId }
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get withdrawal history');
+  }
+};
+
+/**
+ * Get withdrawal status
+ * @param withdrawalId - Withdrawal ID
+ */
+export const getWithdrawalStatus = async (withdrawalId: string) => {
+  try {
+    const response = await api.get(`/razorpay/withdrawal/${withdrawalId}/`);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get withdrawal status');
+  }
+};
+
+/**
+ * Cancel pending withdrawal and refund coins
+ * @param withdrawalId - Withdrawal ID
+ */
+export const cancelWithdrawal = async (withdrawalId: string) => {
+  try {
+    const response = await api.post(`/razorpay/withdrawal/${withdrawalId}/cancel/`);
+    return response.data;
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || error.message || 'Failed to cancel withdrawal');
+  }
+};
+
 export default api;

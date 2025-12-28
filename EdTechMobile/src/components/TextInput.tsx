@@ -64,6 +64,8 @@ export const TextInputComponent: React.FC<TextInputComponentProps> = ({
 const styles = StyleSheet.create({
   container: {
     gap: spacing.lg,
+    minHeight: 340,
+    justifyContent: 'space-between',
   },
   textarea: {
     borderWidth: 2,
@@ -74,6 +76,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.backgroundGray,
     color: colors.text,
     minHeight: 240,
+    flex: 1,
     textAlignVertical: 'top',
   },
   footer: {

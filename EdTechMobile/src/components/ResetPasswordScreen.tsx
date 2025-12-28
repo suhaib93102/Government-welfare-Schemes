@@ -9,10 +9,16 @@ import {
   ActivityIndicator,
   ScrollView,
   Keyboard,
+  Platform,
+  Dimensions,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, typography } from '../styles/theme';
+import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
 import { requestPasswordReset, validateResetToken, resetPassword } from '../services/api';
+
+const { width } = Dimensions.get('window');
+const isMobile = width < 768;
 
 interface ResetPasswordScreenProps {
   onClose: () => void;
@@ -27,6 +33,8 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({
   onBackToLogin,
   initialToken,
 }) => {
+  const [width, setWidth] = useState(Dimensions.get('window').width);
+  const isMobile = width < 768;
   const [step, setStep] = useState<ResetStep>(initialToken ? 'reset' : 'request');
   const [email, setEmail] = useState('');
   const [token, setToken] = useState(initialToken || '');
@@ -139,173 +147,168 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Content */}
-      {step === 'request' && !initialToken ? (
-        <View style={styles.content}>
-          <View style={styles.iconSection}>
-            <View style={styles.iconCircle}>
-              <MaterialIcons name="lock-reset" size={48} color={colors.primary} />
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { flexDirection: isMobile ? 'column' : 'row', alignItems: 'stretch' }]}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* Left brand section - hidden on mobile */}
+        {!isMobile && (
+          <View style={styles.leftSection}>
+            <View style={styles.brandSection}>
+              <View style={styles.logoContainer}>
+                <MaterialIcons name="school" size={40} color={colors.primary} />
+              </View>
+              <Text style={styles.brandTitle}>Unlock Your Potential</Text>
+              <Text style={styles.brandSubtitle}>
+                Elevate your learning experience with our innovative AI-powered study tools and resources to support your growth.
+              </Text>
             </View>
           </View>
+        )}
 
-          <Text style={styles.title}>Forgot Password?</Text>
-          <Text style={styles.subtitle}>
-            Enter your email address and we'll send you a link to reset your password.
-          </Text>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Email Address</Text>
-            <View style={styles.inputContainer}>
-              <MaterialIcons name="email" size={20} color={colors.textMuted} />
-              <TextInput
-                style={styles.input}
-                placeholder="your@email.com"
-                placeholderTextColor={colors.textMuted}
-                value={email}
-                onChangeText={setEmail}
-                editable={!loading}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.button, styles.primaryButton, loading && styles.buttonDisabled]}
-            onPress={handleRequestReset}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.buttonText}>Send Reset Link</Text>
+        {/* Right form section */}
+        <View style={styles.rightSection}>
+          <View style={[styles.formContainer, isMobile && styles.formContainerMobile]}>
+            {/* Mobile logo */}
+            {isMobile && (
+              <View style={styles.mobileLogoContainer}>
+                <View style={styles.logoCircle}>
+                  <MaterialIcons name="lock-reset" size={40} color={colors.primary} />
+                </View>
+              </View>
             )}
-          </TouchableOpacity>
 
-          <TouchableOpacity onPress={onBackToLogin}>
-            <Text style={styles.linkText}>Back to Login</Text>
-          </TouchableOpacity>
-        </View>
-      ) : step === 'reset' ? (
-        <View style={styles.content}>
-          <View style={styles.iconSection}>
-            <View style={styles.iconCircle}>
-              <MaterialIcons name="lock" size={48} color={colors.success} />
-            </View>
+            {step === 'request' && !initialToken ? (
+              <>
+                <Text style={styles.title}>Forgot Password?</Text>
+                <Text style={styles.subtitle}>
+                  No worries, it happens. Please enter the email associated with your account.
+                </Text>
+
+                <View style={styles.form}>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Email Address</Text>
+                    <View style={styles.inputWrapper}>
+                      <MaterialIcons name="email" size={20} color={colors.textMuted} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter your email address"
+                        placeholderTextColor={colors.textMuted}
+                        value={email}
+                        onChangeText={setEmail}
+                        editable={!loading}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                      />
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+                    onPress={handleRequestReset}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color={colors.white} />
+                    ) : (
+                      <Text style={styles.submitButtonText}>Send Reset Link</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <View style={styles.switchMode}>
+                    <Text style={styles.switchModeText}>Remember your password? </Text>
+                    <TouchableOpacity onPress={onBackToLogin}>
+                      <Text style={styles.switchModeLink}>Log in</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.title}>Reset Password</Text>
+                <Text style={styles.subtitle}>
+                  Enter your new password below.
+                </Text>
+
+                <View style={styles.form}>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>New Password</Text>
+                    <View style={styles.inputWrapper}>
+                      <MaterialIcons name="lock" size={20} color={colors.textMuted} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter new password"
+                        placeholderTextColor={colors.textMuted}
+                        value={newPassword}
+                        onChangeText={setNewPassword}
+                        editable={!loading}
+                        secureTextEntry={!showPassword}
+                        autoCapitalize="none"
+                      />
+                      <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                        <MaterialIcons
+                          name={showPassword ? 'visibility' : 'visibility-off'}
+                          size={20}
+                          color={colors.textMuted}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Confirm Password</Text>
+                    <View style={styles.inputWrapper}>
+                      <MaterialIcons name="lock" size={20} color={colors.textMuted} style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Confirm new password"
+                        placeholderTextColor={colors.textMuted}
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        editable={!loading}
+                        secureTextEntry={!showConfirmPassword}
+                        autoCapitalize="none"
+                      />
+                      <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                        <MaterialIcons
+                          name={showConfirmPassword ? 'visibility' : 'visibility-off'}
+                          size={20}
+                          color={colors.textMuted}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+                    onPress={handleResetPassword}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color={colors.white} />
+                    ) : (
+                      <Text style={styles.submitButtonText}>Reset Password</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <View style={styles.switchMode}>
+                    <Text style={styles.switchModeText}>Remember your password? </Text>
+                    <TouchableOpacity onPress={onBackToLogin}>
+                      <Text style={styles.switchModeLink}>Log in</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </>
+            )}
           </View>
-
-          <Text style={styles.title}>Create New Password</Text>
-          <Text style={styles.subtitle}>
-            {resetEmail ? `Resetting password for ${resetEmail}` : 'Enter your new password below'}
-          </Text>
-
-          {!initialToken && (
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Reset Token (from email)</Text>
-              <View style={styles.inputContainer}>
-                <MaterialIcons name="verified" size={20} color={colors.textMuted} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Paste token from email"
-                  placeholderTextColor={colors.textMuted}
-                  value={token}
-                  onChangeText={setToken}
-                  editable={!loading}
-                  autoCapitalize="none"
-                />
-              </View>
-              {token && !initialToken && (
-                <TouchableOpacity
-                  style={[styles.button, styles.secondaryButton]}
-                  onPress={handleValidateToken}
-                  disabled={loading}
-                >
-                  <Text style={styles.secondaryButtonText}>Validate Token</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-
-          {token && (
-            <>
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>New Password</Text>
-                <View style={styles.inputContainer}>
-                  <MaterialIcons name="lock" size={20} color={colors.textMuted} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter new password"
-                    placeholderTextColor={colors.textMuted}
-                    value={newPassword}
-                    onChangeText={setNewPassword}
-                    editable={!loading}
-                    secureTextEntry={!showPassword}
-                  />
-                  <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                    <MaterialIcons
-                      name={showPassword ? 'visibility' : 'visibility-off'}
-                      size={20}
-                      color={colors.textMuted}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Confirm Password</Text>
-                <View style={styles.inputContainer}>
-                  <MaterialIcons name="lock" size={20} color={colors.textMuted} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Confirm password"
-                    placeholderTextColor={colors.textMuted}
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    editable={!loading}
-                    secureTextEntry={!showConfirmPassword}
-                  />
-                  <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                    <MaterialIcons
-                      name={showConfirmPassword ? 'visibility' : 'visibility-off'}
-                      size={20}
-                      color={colors.textMuted}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {newPassword && confirmPassword && newPassword !== confirmPassword && (
-                <View style={styles.errorBox}>
-                  <MaterialIcons name="error-outline" size={16} color={colors.error} />
-                  <Text style={styles.errorText}>Passwords do not match</Text>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  styles.primaryButton,
-                  (loading || newPassword !== confirmPassword) && styles.buttonDisabled,
-                ]}
-                onPress={handleResetPassword}
-                disabled={loading || newPassword !== confirmPassword}
-              >
-                {loading ? (
-                  <ActivityIndicator color={colors.white} />
-                ) : (
-                  <Text style={styles.buttonText}>Reset Password</Text>
-                )}
-              </TouchableOpacity>
-            </>
-          )}
-
-          <TouchableOpacity onPress={onBackToLogin}>
-            <Text style={styles.linkText}>Back to Login</Text>
-          </TouchableOpacity>
         </View>
-      ) : null}
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -316,119 +319,147 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
-    justifyContent: 'center',
   },
-  content: {
+  leftSection: {
     flex: 1,
-    maxWidth: 400,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  iconSection: {
-    alignItems: 'center',
-    marginVertical: spacing.xl,
-  },
-  iconCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
     backgroundColor: '#E8F2FF',
+    padding: spacing.xl,
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: 300,
   },
-  title: {
+  brandSection: {
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+    ...shadows.md,
+  },
+  brandTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
-    marginBottom: spacing.sm,
+    color: '#1e293b',
     textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  brandSubtitle: {
+    fontSize: 15,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  rightSection: {
+    flex: 1,
+    padding: spacing.xl,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+  },
+  formContainer: {
+    width: '100%',
+    maxWidth: 420,
+  },
+  formContainerMobile: {
+    maxWidth: '100%',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  mobileLogoContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#E8F2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+    ...shadows.sm,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: spacing.xs,
   },
   subtitle: {
-    fontSize: 14,
-    color: colors.textMuted,
-    textAlign: 'center',
+    fontSize: 13,
+    color: '#64748b',
     marginBottom: spacing.xl,
-    lineHeight: 20,
+    lineHeight: 18,
   },
-  formGroup: {
+  form: {
+    width: '100%',
+  },
+  inputGroup: {
     marginBottom: spacing.lg,
   },
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.text,
+    color: '#374151',
     marginBottom: spacing.sm,
   },
-  inputContainer: {
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F9FAFB',
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 10,
+  },
+  inputIcon: {
+    marginRight: spacing.sm,
   },
   input: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
     fontSize: 14,
     color: colors.text,
-    height: 24,
+    padding: 0,
+    height: 20,
   },
-  button: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
+  submitButton: {
+    backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
     minHeight: 48,
+    ...shadows.sm,
   },
-  primaryButton: {
-    backgroundColor: colors.primary,
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: colors.primary,
-    backgroundColor: colors.white,
-    marginTop: spacing.sm,
-  },
-  buttonText: {
+  submitButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.white,
   },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  linkText: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: spacing.lg,
-  },
-  errorBox: {
+  switchMode: {
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FEE2E2',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.sm,
-    marginBottom: spacing.md,
+    marginTop: spacing.sm,
   },
-  errorText: {
+  switchModeText: {
     fontSize: 14,
-    color: colors.error,
-    marginLeft: spacing.sm,
+    color: '#6B7280',
+  },
+  switchModeLink: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '600',
   },
 });

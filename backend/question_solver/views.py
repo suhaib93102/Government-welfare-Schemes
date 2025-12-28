@@ -9,6 +9,7 @@ from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django.utils.decorators import method_decorator
 import os
 import logging
 import json
@@ -27,6 +28,7 @@ from .services import (
 from .services.gemini_service import gemini_service
 from .services.quiz_service import quiz_service
 from .models import Quiz, QuizQuestion, UserQuizResponse, QuizSummary
+from .decorators import check_feature_access_class_based
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,7 @@ class QuestionSolverView(APIView):
     """
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     
+    @method_decorator(check_feature_access_class_based('ask_question'))
     def post(self, request):
         """
         Process question from image or text
@@ -359,6 +362,7 @@ class QuizGeneratorView(APIView):
     """
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     
+    @method_decorator(check_feature_access_class_based('quiz'))
     def post(self, request):
         """
         Generate a quiz based on topic or document
@@ -462,6 +466,7 @@ class FlashcardGeneratorView(APIView):
     """
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     
+    @method_decorator(check_feature_access_class_based('flashcards'))
     def post(self, request):
         """
         Generate flashcards based on topic or document
@@ -969,6 +974,7 @@ class PredictedQuestionsView(APIView):
     """
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     
+    @method_decorator(check_feature_access_class_based('predicted_questions'))
     def post(self, request):
         """
         Generate predicted questions from topic or document

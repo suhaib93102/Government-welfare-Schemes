@@ -30,7 +30,7 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [loading, setLoading] = useState(false);
   const [width, setWidth] = useState(initialWidth);
-  const isMobile = width < 768 && !isWeb;
+  const isMobile = width < 768;
 
   useEffect(() => {
     const sub = (Dimensions as any).addEventListener?.('change', ({ window }: any) => {
@@ -242,12 +242,16 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
 
   const renderLogin = () => (
     <View style={[styles.formContainer, isMobile && styles.formContainerMobile]}>
-      {/* Add logo circle at top for mobile */}
+      {/* Logo at top for mobile */}
       {isMobile && (
         <View style={styles.mobileLogoContainer}>
           <View style={styles.logoCircle}>
-            <MaterialIcons name="school" size={48} color={colors.primary} />
+            <MaterialIcons name="school" size={40} color={colors.primary} />
           </View>
+          <Text style={styles.mobileBrandTitle}>Unlock Your Potential</Text>
+          <Text style={styles.mobileBrandSubtitle}>
+            Elevate your learning experience with our innovative AI-powered study tools and resources to support your growth.
+          </Text>
         </View>
       )}
 
@@ -261,7 +265,7 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
             <MaterialIcons name="email" size={20} color={colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Rahuljha996886"
+              placeholder="Enter your email"
               placeholderTextColor={colors.textMuted}
               value={email}
               onChangeText={setEmail}
@@ -283,7 +287,7 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
               value={password}
               onChangeText={(text) => {
                 setPassword(text);
-                if (lastLoginError) setLastLoginError(null); // Clear error on input change
+                if (lastLoginError) setLastLoginError(null);
               }}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
@@ -344,12 +348,16 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
 
   const renderSignup = () => (
     <View style={[styles.formContainer, isMobile && styles.formContainerMobile]}>
-      {/* Add logo circle at top for mobile */}
+      {/* Logo at top for mobile */}
       {isMobile && (
         <View style={styles.mobileLogoContainer}>
           <View style={styles.logoCircle}>
-            <MaterialIcons name="school" size={48} color={colors.primary} />
+            <MaterialIcons name="school" size={40} color={colors.primary} />
           </View>
+          <Text style={styles.mobileBrandTitle}>Unlock Your Potential</Text>
+          <Text style={styles.mobileBrandSubtitle}>
+            Elevate your learning experience with our innovative AI-powered study tools and resources to support your growth.
+          </Text>
         </View>
       )}
 
@@ -363,7 +371,7 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
             <MaterialIcons name="person" size={20} color={colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="John Doe"
+              placeholder="Rahuljha996886"
               placeholderTextColor={colors.textMuted}
               value={fullName}
               onChangeText={setFullName}
@@ -379,7 +387,7 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
             <MaterialIcons name="email" size={20} color={colors.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="example@email.com"
+              placeholder="Rahuljha@123"
               placeholderTextColor={colors.textMuted}
               value={signupEmail}
               onChangeText={setSignupEmail}
@@ -459,8 +467,6 @@ export const AuthScreenNew: React.FC<AuthScreenNewProps> = ({ onAuthSuccess, onB
           )}
         </TouchableOpacity>
 
-        {/* Google Sign-In removed */}
-
         <View style={styles.switchMode}>
           <Text style={styles.switchModeText}>Already have an account? </Text>
           <TouchableOpacity onPress={() => setMode('login')}>
@@ -523,7 +529,7 @@ const styles = StyleSheet.create({
   },
   leftSection: {
     flex: 1,
-    backgroundColor: '#E8F2FF',
+    backgroundColor: Platform.OS === 'web' ? '#E8F2FF' : colors.white,
     padding: spacing.xl,
     justifyContent: 'center',
     alignItems: 'center',
@@ -534,66 +540,84 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
     ...shadows.md,
   },
   brandTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '700',
-    color: colors.text,
+    color: '#1e293b',
     textAlign: 'center',
     marginBottom: spacing.md,
   },
   brandSubtitle: {
-    fontSize: 16,
-    color: colors.textMuted,
+    fontSize: 15,
+    color: '#64748b',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   rightSection: {
     flex: 1,
     padding: spacing.xl,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.white,
   },
   formContainer: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 420,
   },
   formContainerMobile: {
     maxWidth: '100%',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
   },
   mobileLogoContainer: {
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
   logoCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#E8F2FF',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.md,
+    marginBottom: spacing.md,
+    ...shadows.sm,
   },
-  title: {
-    fontSize: 28,
+  mobileBrandTitle: {
+    fontSize: 24,
     fontWeight: '700',
-    color: colors.text,
+    color: '#1e293b',
+    textAlign: 'center',
     marginBottom: spacing.sm,
   },
+  mobileBrandSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: spacing.xs,
+  },
   subtitle: {
-    fontSize: 14,
-    color: colors.textMuted,
+    fontSize: 13,
+    color: '#64748b',
     marginBottom: spacing.xl,
+    lineHeight: 18,
   },
   form: {
     width: '100%',
@@ -604,18 +628,18 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.text,
+    color: '#374151',
     marginBottom: spacing.sm,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F9FAFB',
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 10,
   },
   inputIcon: {
     marginRight: spacing.sm,
@@ -625,7 +649,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text,
     padding: 0,
-    height: 24,
+    height: 20,
   },
   errorText: {
     fontSize: 12,
@@ -635,7 +659,8 @@ const styles = StyleSheet.create({
   },
   forgotPassword: {
     alignSelf: 'flex-end',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+    marginTop: -spacing.sm,
   },
   forgotPasswordText: {
     fontSize: 14,
@@ -645,12 +670,12 @@ const styles = StyleSheet.create({
   submitButton: {
     backgroundColor: colors.primary,
     borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.lg,
-    ...shadows.sm,
+    marginBottom: spacing.md,
     minHeight: 48,
+    ...shadows.sm,
   },
   submitButtonDisabled: {
     opacity: 0.6,
@@ -683,25 +708,26 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: '#E5E7EB',
     borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.md,
+    paddingVertical: 12,
+    marginBottom: spacing.lg,
     minHeight: 48,
   },
   guestButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: colors.primary,
+    fontWeight: '500',
+    color: '#6B7280',
   },
   switchMode: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: spacing.sm,
   },
   switchModeText: {
     fontSize: 14,
-    color: colors.textMuted,
+    color: '#6B7280',
   },
   switchModeLink: {
     fontSize: 14,

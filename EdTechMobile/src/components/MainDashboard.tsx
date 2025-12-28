@@ -12,6 +12,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
 import { getDailyQuiz } from '../services/api';
 import { getUserCoins } from '../services/api';
+import { getQuizSettings } from '../services/mockTestService';
 import { DailyQuizScreen } from './DailyQuizScreen';
 
 interface MainDashboardProps {
@@ -117,11 +118,30 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   const [userCoins, setUserCoins] = useState(0);
   const [showDailyQuiz, setShowDailyQuiz] = useState(false);
   const [dailyQuizAvailable, setDailyQuizAvailable] = useState<boolean | null>(null);
+  const [quizSettings, setQuizSettings] = useState<any>(null);
 
   useEffect(() => {
     loadUserCoins();
     checkDailyQuizStatus();
+    loadQuizSettings();
   }, []);
+
+  const loadQuizSettings = async () => {
+    try {
+      const settings = await getQuizSettings();
+      setQuizSettings(settings);
+    } catch (error) {
+      console.error('Failed to load quiz settings:', error);
+      // Use defaults
+      setQuizSettings({
+        daily_quiz: {
+          attempt_bonus: 5,
+          coins_per_correct: 5,
+          perfect_score_bonus: 10,
+        }
+      });
+    }
+  };
 
   const loadUserCoins = async () => {
     try {
@@ -276,7 +296,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             <View style={styles.dailyQuizText}>
               <Text style={styles.dailyQuizTitle}>Daily Quiz 🎯</Text>
               <Text style={styles.dailyQuizSubtitle}>
-                Answer 5 questions • Earn up to 35 coins
+                Answer 5 questions • Earn up to {quizSettings ? (quizSettings.daily_quiz.attempt_bonus + (5 * quizSettings.daily_quiz.coins_per_correct)) : 35} coins
               </Text>
               {dailyQuizAvailable !== null && (
                 <View style={[styles.dailyBadge, dailyQuizAvailable ? styles.dailyBadgeAvailable : styles.dailyBadgeDone]}>

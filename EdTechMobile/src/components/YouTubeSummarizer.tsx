@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platfo
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
 import AnimatedLoader from './AnimatedLoader';
+import LoadingWebm from './LoadingWebm';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -13,6 +14,7 @@ interface YouTubeSummaryData {
   channel_name?: string;
   video_duration?: string;
   summary: string;
+  concepts?: Array<{ term: string; definition: string }>;
   notes: string[];
   questions: string[];
   estimated_reading_time?: string;
@@ -28,14 +30,18 @@ interface YouTubeSummarizerProps {
 
 export const YouTubeSummarizer: React.FC<YouTubeSummarizerProps> = ({ summaryData, loading, onSubmit }) => {
   const [videoUrl, setVideoUrl] = useState('');
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({ summary: true, notes: false, questions: false });
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({ summary: true, concepts: true, notes: false, questions: false });
 
   const toggle = (key: string) => setExpanded({ ...expanded, [key]: !expanded[key] });
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <AnimatedLoader visible={true} size="large" />
+      <View style={styles.container}>
+        <View style={styles.contentWrapper}>
+          <View style={styles.pageCard}>
+            <LoadingWebm visible={true} overlay={false} />
+          </View>
+        </View>
       </View>
     );
   }
@@ -96,6 +102,21 @@ export const YouTubeSummarizer: React.FC<YouTubeSummarizerProps> = ({ summaryDat
           {expanded.summary && <Text style={styles.summaryText}>{summaryData.summary}</Text>}
         </View>
 
+        {summaryData.concepts && summaryData.concepts.length > 0 && (
+          <View style={styles.sectionCard}>
+            <TouchableOpacity onPress={() => toggle('concepts')} style={styles.sectionHeaderSimple}>
+              <Text style={styles.sectionTitle}>Key Concepts ({summaryData.concepts.length})</Text>
+              <MaterialIcons name={expanded.concepts ? 'expand-less' : 'expand-more'} size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+            {expanded.concepts && summaryData.concepts.map((c, i) => (
+              <View key={i} style={styles.conceptItem}>
+                <Text style={styles.conceptTerm}>{c.term}</Text>
+                <Text style={styles.conceptDefinition}>{c.definition}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         <View style={styles.sectionCard}>
           <TouchableOpacity onPress={() => toggle('notes')} style={styles.sectionHeaderSimple}>
             <Text style={styles.sectionTitle}>Notes ({summaryData.notes.length})</Text>
@@ -120,18 +141,46 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl, backgroundColor: 'transparent', minHeight: 400 },
   loadingText: { ...typography.h3, color: colors.text, marginTop: spacing.md },
-  contentWrapper: { alignSelf: 'center', width: '100%', maxWidth: isWeb && !isMobile ? 1100 : '100%', padding: spacing.lg },
-  pageCard: { backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.lg, ...shadows.md, alignItems: 'center' },
+  contentWrapper: { flex: 1, padding: spacing.lg },
+  pageCard: { backgroundColor: 'transparent', borderRadius: 0, padding: 0, alignItems: 'center' },
   headerImage: { width: 100, height: 100, marginBottom: spacing.md },
   headerTitle: { ...typography.h2, textAlign: 'center' },
-  headerSubtitle: { ...typography.body, color: colors.textMuted, textAlign: 'center', marginTop: spacing.sm },
-  inputCard: { width: '100%', marginTop: spacing.md },
-  inputLabel: { ...typography.h4, color: colors.text, marginBottom: spacing.sm },
-  inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.background, borderRadius: borderRadius.md, padding: spacing.md, marginBottom: spacing.md },
-  input: { marginLeft: spacing.sm, flex: 1, ...typography.body, color: colors.text },
-  actionButton: { marginTop: spacing.md, backgroundColor: colors.primary, padding: spacing.md, borderRadius: borderRadius.md, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' as any },
-  actionDisabled: { opacity: 0.6, backgroundColor: colors.textMuted },
-  actionText: { ...typography.h4, color: colors.white, marginLeft: 8 },
+  headerSubtitle: { ...typography.body, color: colors.textMuted, textAlign: 'center', marginTop: spacing.sm, marginBottom: spacing.lg },
+  inputCard: { 
+    backgroundColor: colors.white, 
+    marginHorizontal: spacing.lg, 
+    borderRadius: borderRadius.xl, 
+    padding: spacing.lg,
+    overflow: 'hidden',
+    ...shadows.sm,
+    marginBottom: spacing.lg,
+  },
+  inputLabel: { ...typography.h4, color: colors.text, marginBottom: spacing.md, fontWeight: '600' },
+  inputRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: colors.background, 
+    borderRadius: borderRadius.lg, 
+    padding: spacing.md, 
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  input: { marginLeft: spacing.sm, flex: 1, ...typography.body, color: colors.text, outlineStyle: 'none' as any },
+  actionButton: { 
+    marginTop: spacing.sm, 
+    backgroundColor: colors.primary, 
+    paddingVertical: spacing.lg, 
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.lg, 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    alignItems: 'center' as any,
+    ...shadows.md,
+  },
+  actionDisabled: { opacity: 0.5, backgroundColor: colors.textMuted },
+  actionText: { ...typography.h4, color: colors.white, marginLeft: spacing.sm, fontWeight: '600' },
   resultHeader: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg, backgroundColor: colors.white, marginBottom: spacing.md },
   resultTitle: { ...typography.h3, flex: 1 },
   resultChannel: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs },
@@ -139,6 +188,9 @@ const styles = StyleSheet.create({
   sectionHeaderSimple: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionTitle: { ...typography.h3 },
   summaryText: { ...typography.body, marginTop: spacing.sm, color: colors.text },
+  conceptItem: { marginTop: spacing.sm, paddingLeft: spacing.sm, borderLeftWidth: 3, borderLeftColor: colors.primary },
+  conceptTerm: { ...typography.h4, color: colors.primary, marginBottom: spacing.xs },
+  conceptDefinition: { ...typography.body, color: colors.text },
   noteText: { ...typography.body, marginTop: spacing.xs, color: colors.textMuted },
   questionText: { ...typography.body, marginTop: spacing.xs, color: colors.text },
 });

@@ -15,7 +15,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
 import { getDailyQuiz, submitDailyQuiz, startDailyQuiz, getUserCoins } from '../services/api';
-import { getDailyQuizQuestions } from '../services/mockTestService';
+import { getDailyQuizQuestions, getQuizSettings } from '../services/mockTestService';
 import LoadingWebm from './LoadingWebm';
 import { DailyQuizResults } from './DailyQuizResults';
 
@@ -25,7 +25,7 @@ const isMobile = width < 768;
 
 interface DailyQuizScreenProps {
   userId: string;
-  onComplete: () => void;
+  onComplete: (totalCoins?: number) => void;
   onClose: () => void;
   visible?: boolean;
 }
@@ -48,6 +48,8 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
   const [coinAnim] = useState(new Animated.Value(0));
   const [attemptCoinsAwarded, setAttemptCoinsAwarded] = useState<number>(0);
   const [userCoins, setUserCoins] = useState<number>(0);
+  const [language, setLanguage] = useState<'english' | 'hindi'>('english');
+  const [quizSettings, setQuizSettings] = useState<any>(null);
 
   const formatResultText = (value: any): string => {
     if (!value && value !== 0) return '';
@@ -65,8 +67,27 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
     if (!showDetailedResults) return;
   }, [showDetailedResults]);
 
+  const loadQuizSettings = async () => {
+    try {
+      const settings = await getQuizSettings();
+      setQuizSettings(settings);
+      console.log('Loaded quiz settings:', settings);
+    } catch (error) {
+      console.error('Failed to load quiz settings:', error);
+      // Use default fallback values
+      setQuizSettings({
+        daily_quiz: {
+          attempt_bonus: 5,
+          coins_per_correct: 5,
+          perfect_score_bonus: 10,
+        }
+      });
+    }
+  };
+
   useEffect(() => {
     // initial load
+    loadQuizSettings();
     loadQuiz();
     loadUserCoins();
   }, []);
@@ -83,6 +104,13 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
       loadQuiz();
     }
   }, [visible]);
+
+  // Reload quiz when language changes
+  useEffect(() => {
+    if (quizState === 'not-started') {
+      loadQuiz();
+    }
+  }, [language]);
 
   const loadUserCoins = async () => {
     try {
@@ -107,7 +135,7 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
       console.log('Loading quiz for user:', userId);
       
       // Use local DailyQuiz.json file with 20 random questions
-      const localQuizData = getDailyQuizQuestions(20);
+      const localQuizData = getDailyQuizQuestions(20, language);
       
       // Format the data to match expected structure
       const questions = localQuizData.questions.map((q: any, idx: number) => ({
@@ -120,10 +148,15 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
         difficulty: q.difficulty || 'medium',
       }));
 
+      // Use dynamic quiz settings from backend
+      const attemptBonus = quizSettings?.daily_quiz?.attempt_bonus ?? 5;
+      const coinsPerCorrect = quizSettings?.daily_quiz?.coins_per_correct ?? 5;
+      const perfectScoreBonus = quizSettings?.daily_quiz?.perfect_score_bonus ?? 10;
+
       const coins = { 
-        attempt_bonus: 5, 
-        per_correct_answer: 5, 
-        max_possible: 5 + (questions.length * 5) 
+        attempt_bonus: attemptBonus, 
+        per_correct_answer: coinsPerCorrect, 
+        max_possible: attemptBonus + (questions.length * coinsPerCorrect) 
       };
 
       // Set quiz data with local questions
@@ -147,8 +180,10 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
       
     } catch (error: any) {
       console.error('Failed to load quiz:', error);
-      // Show fallback UI
-      setQuizData({ questions: [], coins: { attempt_bonus: 5, per_correct_answer: 5, max_possible: 5 } });
+      // Show fallback UI with settings or defaults
+      const attemptBonus = quizSettings?.daily_quiz?.attempt_bonus ?? 5;
+      const coinsPerCorrect = quizSettings?.daily_quiz?.coins_per_correct ?? 5;
+      setQuizData({ questions: [], coins: { attempt_bonus: attemptBonus, per_correct_answer: coinsPerCorrect, max_possible: attemptBonus } });
       setQuizState('not-started');
     } finally {
       setLoading(false);
@@ -242,75 +277,22 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
       setLoading(true);
       const timeTaken = Math.floor((Date.now() - startTime) / 1000);
       console.log('Time taken:', timeTaken, 'seconds');
+      console.log('Submitting to backend API...');
       
-      // Calculate results locally
-      let correctCount = 0;
-      const resultsDetails: any[] = [];
+      // Submit to backend and get total_coins from server
+      const backendResponse = await submitDailyQuiz(
+        userId || 'anonymous',
+        quizData.quiz_id,
+        answers,
+        timeTaken
+      );
       
-      quizData.questions.forEach((question: any, idx: number) => {
-        const questionId = String(idx + 1);
-        const userAnswer = answers[questionId];
-        const correctAnswer = question.correctAnswer ?? 0;
-        const isCorrect = userAnswer === correctAnswer;
-        
-        if (isCorrect) {
-          correctCount++;
-        }
-        
-        resultsDetails.push({
-          question_id: idx + 1,
-          question: question.question,
-          options: question.options,
-          user_answer_index: userAnswer,
-          correct_answer_index: correctAnswer,
-          user_answer: question.options?.[userAnswer] ?? 'No answer',
-          correct_answer: question.options?.[correctAnswer] ?? 'Unknown',
-          is_correct: isCorrect,
-          explanation: question.explanation || 'No explanation available',
-          fun_fact: question.fun_fact || '',
-          category: question.category,
-        });
-      });
+      console.log('Backend response received:', backendResponse);
+      console.log('total_coins from backend:', backendResponse.total_coins);
       
-      const totalQuestions = quizData.questions.length;
-      const scorePercentage = (correctCount / totalQuestions) * 100;
-      const perCorrectCoins = quizData.coins?.per_correct_answer ?? 5;
-      const coinsFromCorrect = correctCount * perCorrectCoins;
-      const attemptBonus = attemptCoinsAwarded;
-      const totalCoinsEarned = attemptBonus + coinsFromCorrect;
-      
-      const result = {
-        result: {
-          correct_count: correctCount,
-          total_questions: totalQuestions,
-          score_percentage: scorePercentage,
-          coins_earned: totalCoinsEarned,
-          attempt_bonus: attemptBonus,
-          per_correct: perCorrectCoins,
-          results: resultsDetails,
-          coin_breakdown: {
-            attempt_bonus: attemptBonus,
-            correct_answers: correctCount,
-            correct_answer_coins: coinsFromCorrect,
-            total_earned: totalCoinsEarned,
-          },
-        },
-        correct_count: correctCount,
-        total_questions: totalQuestions,
-        score_percentage: scorePercentage,
-        coins_earned: totalCoinsEarned,
-        results: resultsDetails,
-        coin_breakdown: {
-          attempt_bonus: attemptBonus,
-          correct_answers: correctCount,
-          correct_answer_coins: coinsFromCorrect,
-          total_earned: totalCoinsEarned,
-        },
-      };
-      
-      console.log('Quiz completed locally, result:', result);
-      setAttemptCoinsAwarded(totalCoinsEarned);
-      setResults(result);
+      // Use backend response which has total_coins
+      setAttemptCoinsAwarded(backendResponse.result?.coins_earned || backendResponse.coins_earned || 0);
+      setResults(backendResponse);
       setQuizState('completed');
       animateCoins();
     } catch (error: any) {
@@ -528,7 +510,22 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
           <TouchableOpacity
             style={styles.doneButton}
             onPress={() => {
-              onComplete();
+              // Use total_coins from server response instead of local calculation
+              const serverTotalCoins = results.result?.total_coins || results.total_coins;
+              console.log('=== DAILY QUIZ COMPLETE ===');
+              console.log('Results object:', JSON.stringify(results, null, 2));
+              console.log('Server total_coins:', serverTotalCoins);
+              console.log('Calling onComplete with:', serverTotalCoins);
+              
+              if (serverTotalCoins !== undefined) {
+                onComplete(serverTotalCoins);
+              } else {
+                console.warn('WARNING: total_coins is undefined in response!');
+                console.warn('Result structure:', Object.keys(results));
+                if (results.result) {
+                  console.warn('Result.result structure:', Object.keys(results.result));
+                }
+              }
               onClose();
             }}
           >
@@ -560,63 +557,100 @@ export const DailyQuizScreen: React.FC<DailyQuizScreenProps> = ({
         <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
           <View style={styles.startCard}>
             <Image source={require('../../assets/Quiz.png')} style={styles.quizImage} resizeMode="contain" />
-            <Text style={styles.quizTitle}>Daily Quiz</Text>
+            
+            {/* Language Toggle */}
+            <View style={styles.languageToggle}>
+              <TouchableOpacity
+                style={[styles.languageButton, language === 'english' && styles.languageButtonActive]}
+                onPress={() => setLanguage('english')}
+              >
+                <Text style={[styles.languageButtonText, language === 'english' && styles.languageButtonTextActive]}>
+                  English
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.languageButton, language === 'hindi' && styles.languageButtonActive]}
+                onPress={() => setLanguage('hindi')}
+              >
+                <Text style={[styles.languageButtonText, language === 'hindi' && styles.languageButtonTextActive]}>
+                  हिंदी
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.quizTitle}>{language === 'hindi' ? 'दैनिक प्रश्नोत्तरी' : 'Daily Quiz'}</Text>
             <Text style={styles.quizDescription}>
-              {quizData.quiz_metadata?.description || 'Test your knowledge with AI-generated questions!'}
+              {language === 'hindi' 
+                ? 'आज की प्रश्नोत्तरी के साथ अपने ज्ञान का परीक्षण करें!'
+                : (quizData.quiz_metadata?.description || 'Test your knowledge with today\'s quiz!')}
             </Text>
 
             <View style={styles.infoBox}>
               <View style={styles.infoRow}>
                 <MaterialIcons name="quiz" size={20} color={colors.primary} />
                 <Text style={styles.infoText}>
-                  {quizData.questions?.length ?? 5} Questions
+                  {quizData.questions?.length ?? 5} {language === 'hindi' ? 'प्रश्न' : 'Questions'}
                 </Text>
               </View>
               <View style={styles.infoRow}>
                 <MaterialIcons name="timer" size={20} color={colors.primary} />
-                <Text style={styles.infoText}>No time limit</Text>
+                <Text style={styles.infoText}>{language === 'hindi' ? 'कोई समय सीमा नहीं' : 'No time limit'}</Text>
               </View>
               <View style={styles.infoRow}>
                 <MaterialIcons name="emoji-events" size={20} color={colors.warning} />
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={styles.infoText}>Earn up to {quizData.coins?.max_possible || 30} coins!</Text>
+                  <Text style={styles.infoText}>
+                    {language === 'hindi' 
+                      ? `${quizData.coins?.max_possible || 30} सिक्के तक कमाएं!`
+                      : `Earn up to ${quizData.coins?.max_possible || 30} coins!`}
+                  </Text>
                   <Image source={require('../../assets/coins.png')} style={{ width: 18, height: 18, marginLeft: spacing.xs }} />
                 </View>
               </View>
             </View>
 
             <View style={styles.rewardCard}>
-              <Text style={styles.rewardTitle}>Coin Rewards</Text>
+              <Text style={styles.rewardTitle}>{language === 'hindi' ? 'सिक्का पुरस्कार' : 'Coin Rewards'}</Text>
               <View style={styles.rewardRow}>
                 <MaterialIcons name="play-circle" size={24} color={colors.success} />
                 <Text style={styles.rewardText}>
-                  +{quizData.coins?.attempt_bonus || 5} coins for starting
+                  {language === 'hindi' 
+                    ? `शुरू करने के लिए +${quizData.coins?.attempt_bonus || 5} सिक्के`
+                    : `+${quizData.coins?.attempt_bonus || 5} coins for starting`}
                 </Text>
               </View>
               <View style={styles.rewardRow}>
                 <MaterialIcons name="check-circle" size={24} color={colors.success} />
                 <Text style={styles.rewardText}>
-                  +{quizData.coins?.per_correct_answer || 5} coins per correct answer
+                  {language === 'hindi'
+                    ? `प्रति सही उत्तर +${quizData.coins?.per_correct_answer || 5} सिक्के`
+                    : `+${quizData.coins?.per_correct_answer || 5} coins per correct answer`}
                 </Text>
               </View>
             </View>
 
             <TouchableOpacity style={[styles.startButton, !(quizData?.questions?.length > 0) && styles.startButtonDisabled]} onPress={handleStartQuiz} disabled={!(quizData?.questions?.length > 0)}>
               <MaterialIcons name="play-arrow" size={24} color={colors.white} />
-              <Text style={styles.startButtonText}>Start Daily Quiz</Text>
+              <Text style={styles.startButtonText}>
+                {language === 'hindi' ? 'दैनिक प्रश्नोत्तरी शुरू करें' : 'Start Daily Quiz'}
+              </Text>
             </TouchableOpacity>
 
             {(!quizData?.questions || quizData.questions.length === 0) && (
               <View style={{ marginTop: spacing.md }}>
-                <Text style={{ ...typography.small, color: colors.textMuted }}>No questions available right now. Please try again.</Text>
+                <Text style={{ ...typography.small, color: colors.textMuted }}>
+                  {language === 'hindi' 
+                    ? 'अभी कोई प्रश्न उपलब्ध नहीं हैं। कृपया पुनः प्रयास करें।'
+                    : 'No questions available right now. Please try again.'}
+                </Text>
                 <TouchableOpacity style={[styles.doneButton, { marginTop: spacing.sm }]} onPress={loadQuiz}>
-                  <Text style={styles.doneButtonText}>Retry</Text>
+                  <Text style={styles.doneButtonText}>{language === 'hindi' ? 'पुनः प्रयास करें' : 'Retry'}</Text>
                 </TouchableOpacity>
               </View>
             )}
 
             <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>Maybe Later</Text>
+              <Text style={styles.cancelButtonText}>{language === 'hindi' ? 'बाद में' : 'Maybe Later'}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -882,6 +916,34 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     ...shadows.md,
     alignItems: 'center',
+  },
+  languageToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.backgroundLight,
+    borderRadius: borderRadius.md,
+    padding: spacing.xs,
+    marginBottom: spacing.lg,
+    gap: spacing.xs,
+  },
+  languageButton: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  languageButtonActive: {
+    backgroundColor: colors.primary,
+    ...shadows.sm,
+  },
+  languageButtonText: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  languageButtonTextActive: {
+    color: colors.white,
+    fontWeight: '600',
   },
   quizImage: {
     width: 120,

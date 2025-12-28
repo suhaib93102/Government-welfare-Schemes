@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
 import AnimatedLoader from './AnimatedLoader';
+import LoadingWebm from './LoadingWebm';
 
 interface QuizQuestion {
   id: number;
@@ -77,7 +78,7 @@ export const Quiz: React.FC<QuizProps> = ({ quizData, loading }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <AnimatedLoader visible={true} size="large" />
+        <LoadingWebm visible={true} />
       </View>
     );
   }

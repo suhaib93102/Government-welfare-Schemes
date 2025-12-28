@@ -5,6 +5,7 @@ import { colors, spacing, borderRadius, typography, shadows } from '../styles/th
 import { TextInputComponent } from './TextInput';
 import { ImageUpload } from './ImageUpload';
 import AnimatedLoader from './AnimatedLoader';
+import LoadingWebm from './LoadingWebm';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -41,8 +42,8 @@ export const Flashcard: React.FC<FlashcardProps> = ({ flashcardData, loading, on
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <AnimatedLoader visible={true} size="large" />
+      <View style={{ flex: 1 }}>
+        <LoadingWebm visible={true} />
       </View>
     );
   }

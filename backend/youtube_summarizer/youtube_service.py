@@ -201,11 +201,12 @@ class YouTubeService:
         prompt = f"""You are an expert educator. Analyze the following YouTube video transcript and provide:
 
 1. A clean, structured summary (2-3 paragraphs)
-2. Well-formatted notes in bullet points (10-15 key points)
-3. Exactly 5 exam-style questions based on the content
-4. Estimated reading time for the summary
-5. Difficulty level (Beginner/Intermediate/Advanced)
-6. 5-7 key keywords/topics covered
+2. Key concept definitions (5-8 important concepts explained clearly)
+3. Well-formatted notes in bullet points (10-15 key points)
+4. Exactly 3 exam-style quiz questions based on the content
+5. Estimated reading time for the summary
+6. Difficulty level (Beginner/Intermediate/Advanced)
+7. 5-7 key keywords/topics covered
 
 Video Title: {video_title}
 
@@ -215,8 +216,9 @@ Transcript:
 IMPORTANT: Return ONLY a valid JSON object with this exact structure:
 {{
   "summary": "detailed summary here",
+  "concepts": [{{"term": "concept name", "definition": "clear explanation"}}, ...],
   "notes": ["point 1", "point 2", ...],
-  "questions": ["question 1", "question 2", "question 3", "question 4", "question 5"],
+  "questions": ["question 1", "question 2", "question 3"],
   "estimated_reading_time": "X minutes",
   "difficulty_level": "Beginner|Intermediate|Advanced",
   "keywords": ["keyword1", "keyword2", ...]
@@ -256,12 +258,16 @@ Do not include any text before or after the JSON object."""
                 if field not in result:
                     raise ValueError(f"Missing required field in Gemini response: {field}")
             
-            # Ensure we have exactly 5 questions
-            if len(result['questions']) > 5:
-                result['questions'] = result['questions'][:5]
-            elif len(result['questions']) < 5:
+            # Ensure we have concepts field
+            if 'concepts' not in result:
+                result['concepts'] = []
+            
+            # Ensure we have exactly 3 questions
+            if len(result['questions']) > 3:
+                result['questions'] = result['questions'][:3]
+            elif len(result['questions']) < 3:
                 # Pad with generic questions if needed
-                while len(result['questions']) < 5:
+                while len(result['questions']) < 3:
                     result['questions'].append(f"What are the key concepts discussed in this video?")
             
             return result
@@ -295,6 +301,7 @@ Do not include any text before or after the JSON object."""
             'channel_name': metadata['channel_name'],
             'video_duration': metadata['duration'],
             'summary': summary_data.get('summary', ''),
+            'concepts': summary_data.get('concepts', []),
             'notes': summary_data.get('notes', []),
             'questions': summary_data.get('questions', []),
             'estimated_reading_time': summary_data.get('estimated_reading_time', '5 minutes'),

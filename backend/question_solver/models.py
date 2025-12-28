@@ -4,25 +4,155 @@ import uuid
 from datetime import timedelta
 
 
+class SubscriptionPlan(models.Model):
+    """
+    Pricing Plans for the EdTech platform
+    - Free: 3 uses per feature
+    - Premium: ₹1 for first month, then ₹99/month (auto-pay)
+    """
+    PLAN_TYPE_CHOICES = [
+        ('basic', 'BASIC'),
+        ('premium', 'PREMIUM'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=50, choices=PLAN_TYPE_CHOICES, unique=True)
+    display_name = models.CharField(max_length=100)
+    description = models.TextField()
+    
+    # Pricing
+    first_month_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)  # ₹1 for premium
+    recurring_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)  # ₹99 for premium
+    currency = models.CharField(max_length=3, default='INR')
+    
+    # Feature Limits (null = unlimited)
+    mock_test_limit = models.IntegerField(null=True, blank=True, help_text="null = unlimited")
+    quiz_limit = models.IntegerField(null=True, blank=True, help_text="null = unlimited")
+    pair_quiz_limit = models.IntegerField(null=True, blank=True, help_text="null = unlimited")
+    flashcards_limit = models.IntegerField(null=True, blank=True, help_text="null = unlimited")
+    ask_question_limit = models.IntegerField(null=True, blank=True, help_text="null = unlimited")
+    predicted_questions_limit = models.IntegerField(null=True, blank=True, help_text="null = unlimited")
+    previous_papers_limit = models.IntegerField(null=True, blank=True, help_text="null = unlimited")
+    pyq_features_limit = models.IntegerField(null=True, blank=True, help_text="null = unlimited")
+    youtube_summarizer_limit = models.IntegerField(null=True, blank=True, help_text="null = unlimited")
+    daily_quiz_limit = models.IntegerField(null=True, blank=True, help_text="null = unlimited")
+    
+    # Metadata
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['first_month_price']
+        indexes = [
+            models.Index(fields=['name']),
+            models.Index(fields=['is_active']),
+        ]
+    
+    def __str__(self):
+        return f"{self.display_name} - ₹{self.first_month_price}/₹{self.recurring_price}"
+    
+    def get_feature_dict(self):
+        """Return feature limits as a dictionary"""
+        return {
+            'mock_test': self.mock_test_limit,
+            'quiz': self.quiz_limit,
+            'pair_quiz': self.pair_quiz_limit,
+            'flashcards': self.flashcards_limit,
+            'ask_question': self.ask_question_limit,
+            'predicted_questions': self.predicted_questions_limit,
+            'previous_papers': self.previous_papers_limit,
+            'pyq_features': self.pyq_features_limit,
+            'youtube_summarizer': self.youtube_summarizer_limit,
+            'daily_quiz': self.daily_quiz_limit,
+        }
+    
+    @staticmethod
+    def initialize_default_plans():
+        """Initialize default FREE and PREMIUM plans"""
+        # BASIC Plan (₹1 for first month, ₹99/month thereafter)
+        SubscriptionPlan.objects.get_or_create(
+            name='basic',
+            defaults={
+                'display_name': 'BASIC Plan',
+                'description': '₹1 for first month · ₹99/month from next month · Auto-debit enabled · Cancel anytime',
+                'first_month_price': 1.00,
+                'recurring_price': 99.00,
+                'mock_test_limit': 2,
+                'quiz_limit': 5,
+                'flashcards_limit': 20,
+                'ask_question_limit': 5,
+                'predicted_questions_limit': 3,
+                'youtube_summarizer_limit': 2,
+                # Removed features
+                'pair_quiz_limit': 0,
+                'previous_papers_limit': 0,
+                'pyq_features_limit': 10,  # PYQ is kept
+                'daily_quiz_limit': 0,
+            }
+        )
+        
+        # PREMIUM Plan (All features unlimited)
+        SubscriptionPlan.objects.get_or_create(
+            name='premium',
+            defaults={
+                'display_name': 'PREMIUM Plan',
+                'description': 'All features unlimited · Priority support · Advanced analytics',
+                'first_month_price': 199.00,
+                'recurring_price': 499.00,
+                'mock_test_limit': None,  # Unlimited
+                'quiz_limit': None,  # Unlimited
+                'flashcards_limit': None,  # Unlimited
+                'ask_question_limit': None,  # Unlimited
+                'predicted_questions_limit': None,  # Unlimited
+                'youtube_summarizer_limit': None,  # Unlimited
+                # Removed features
+                'pair_quiz_limit': None,
+                'previous_papers_limit': None,
+                'pyq_features_limit': None,  # PYQ Unlimited
+                'daily_quiz_limit': None,
+            }
+        )
+
+
 class UserSubscription(models.Model):
     """Track user subscription status and feature limits"""
     PLAN_CHOICES = [
-        ('free', 'Free'),
-        ('premium', 'Premium'),
+        ('basic', 'BASIC'),
+        ('premium', 'PREMIUM'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user_id = models.CharField(max_length=255, unique=True)  # Can be device ID or user email
-    plan = models.CharField(max_length=50, choices=PLAN_CHOICES, default='free')
+    plan = models.CharField(max_length=50, choices=PLAN_CHOICES, default='basic')
+    subscription_plan = models.ForeignKey(SubscriptionPlan, on_delete=models.SET_NULL, null=True, blank=True)
     
-    # Feature usage tracking
-    ask_questions_used = models.IntegerField(default=0)  # Monthly usage
-    quiz_generated = models.IntegerField(default=0)  # Monthly usage
-    flashcards_generated = models.IntegerField(default=0)  # Monthly usage
+    # Feature usage tracking (monthly reset) - ONLY 7 FEATURES
+    mock_test_used = models.IntegerField(default=0)
+    quiz_used = models.IntegerField(default=0)
+    flashcards_used = models.IntegerField(default=0)
+    ask_question_used = models.IntegerField(default=0)
+    predicted_questions_used = models.IntegerField(default=0)
+    youtube_summarizer_used = models.IntegerField(default=0)
+    pyqs_used = models.IntegerField(default=0)  # PYQ
     
-    # Auto-pay settings
-    auto_pay_enabled = models.BooleanField(default=False)
-    payment_method = models.CharField(max_length=50, blank=True)  # 'card', 'upi', 'wallet'
+    # Razorpay Subscription fields
+    razorpay_customer_id = models.CharField(max_length=255, blank=True, null=True)
+    razorpay_subscription_id = models.CharField(max_length=255, blank=True, null=True)
+    subscription_status = models.CharField(
+        max_length=50, 
+        choices=[
+            ('active', 'Active'),
+            ('cancelled', 'Cancelled'),
+            ('failed', 'Failed'),
+            ('paused', 'Paused'),
+        ],
+        default='active'
+    )
+    
+    # Subscription status
+    is_trial = models.BooleanField(default=False)  # True if first month (₹1)
+    trial_end_date = models.DateTimeField(null=True, blank=True)
     
     # Billing dates
     subscription_start_date = models.DateTimeField(auto_now_add=True)
@@ -47,18 +177,24 @@ class UserSubscription(models.Model):
     
     def get_feature_limits(self):
         """Get feature limits based on plan"""
-        if self.plan == 'free':
-            return {
-                'ask_questions': {'limit': 3, 'used': self.ask_questions_used},
-                'quiz': {'limit': 3, 'used': self.quiz_generated},
-                'flashcards': {'limit': 3, 'used': self.flashcards_generated},
-            }
-        elif self.plan == 'premium':
-            return {
-                'ask_questions': {'limit': None, 'used': self.ask_questions_used},  # Unlimited
-                'quiz': {'limit': None, 'used': self.quiz_generated},  # Unlimited
-                'flashcards': {'limit': None, 'used': self.flashcards_generated},  # Unlimited
-            }
+        # Get plan limits
+        if self.subscription_plan:
+            plan = self.subscription_plan
+        else:
+            # Fallback to default limits
+            plan = SubscriptionPlan.objects.filter(name=self.plan).first()
+            if not plan:
+                return {}
+        
+        return {
+            'mock_test': {'limit': plan.mock_test_limit, 'used': self.mock_test_used},
+            'quiz': {'limit': plan.quiz_limit, 'used': self.quiz_used},
+            'flashcards': {'limit': plan.flashcards_limit, 'used': self.flashcards_used},
+            'ask_question': {'limit': plan.ask_question_limit, 'used': self.ask_question_used},
+            'predicted_questions': {'limit': plan.predicted_questions_limit, 'used': self.predicted_questions_used},
+            'youtube_summarizer': {'limit': plan.youtube_summarizer_limit, 'used': self.youtube_summarizer_used},
+            'pyqs': {'limit': plan.pyq_features_limit, 'used': self.pyqs_used},
+        }
     
     def can_use_feature(self, feature_name):
         """Check if user can use a feature"""
@@ -74,21 +210,34 @@ class UserSubscription(models.Model):
     
     def increment_feature_usage(self, feature_name):
         """Increment feature usage"""
-        if feature_name == 'ask_questions':
-            self.ask_questions_used += 1
-        elif feature_name == 'quiz':
-            self.quiz_generated += 1
-        elif feature_name == 'flashcards':
-            self.flashcards_generated += 1
-        self.save()
+        field_name = f'{feature_name}_used'
+        if hasattr(self, field_name):
+            current_value = getattr(self, field_name)
+            setattr(self, field_name, current_value + 1)
+            self.save()
     
     def reset_monthly_usage(self):
         """Reset monthly usage counters"""
-        self.ask_questions_used = 0
-        self.quiz_generated = 0
-        self.flashcards_generated = 0
+        self.mock_test_used = 0
+        self.quiz_used = 0
+        self.flashcards_used = 0
+        self.ask_question_used = 0
+        self.predicted_questions_used = 0
+        self.youtube_summarizer_used = 0
+        self.pyqs_used = 0
         self.usage_reset_date = timezone.now()
         self.save()
+    
+    def get_next_billing_amount(self):
+        """Get the amount for next billing cycle"""
+        if self.is_trial and self.trial_end_date and timezone.now() < self.trial_end_date:
+            # Still in trial, next billing will be regular price
+            plan = self.subscription_plan or SubscriptionPlan.objects.filter(name=self.plan).first()
+            return plan.recurring_price if plan else 99.00
+        else:
+            # Regular billing
+            plan = self.subscription_plan or SubscriptionPlan.objects.filter(name=self.plan).first()
+            return plan.recurring_price if plan else 99.00
 
 
 class Payment(models.Model):
@@ -130,6 +279,100 @@ class Payment(models.Model):
     
     def __str__(self):
         return f"Payment {self.transaction_id} - {self.status.upper()} (₹{self.amount})"
+
+
+class PromoCode(models.Model):
+    """Promotional codes for discounts and offers"""
+    DISCOUNT_TYPE_CHOICES = [
+        ('percentage', 'Percentage'),
+        ('fixed', 'Fixed Amount'),
+        ('free_trial', 'Free Trial'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=50, unique=True, help_text="Promo code (e.g., WELCOME100)")
+    discount_type = models.CharField(max_length=20, choices=DISCOUNT_TYPE_CHOICES, default='percentage')
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2, help_text="Percentage (0-100) or Fixed Amount")
+    
+    # Applicability
+    applicable_plans = models.JSONField(default=list, help_text="List of plan names (e.g., ['scholar', 'genius'])")
+    max_uses = models.IntegerField(null=True, blank=True, help_text="Max total uses (null = unlimited)")
+    max_uses_per_user = models.IntegerField(default=1, help_text="Max uses per user")
+    
+    # Validity
+    valid_from = models.DateTimeField(default=timezone.now)
+    valid_until = models.DateTimeField(null=True, blank=True)
+    
+    # Tracking
+    times_used = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    
+    # Metadata
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['code']),
+            models.Index(fields=['is_active', 'valid_from', 'valid_until']),
+        ]
+    
+    def __str__(self):
+        return f"{self.code} - {self.discount_value}{'%' if self.discount_type == 'percentage' else ' INR'} off"
+    
+    def is_valid(self):
+        """Check if promo code is currently valid"""
+        now = timezone.now()
+        if not self.is_active:
+            return False, "Promo code is inactive"
+        if now < self.valid_from:
+            return False, "Promo code not yet valid"
+        if self.valid_until and now > self.valid_until:
+            return False, "Promo code has expired"
+        if self.max_uses and self.times_used >= self.max_uses:
+            return False, "Promo code usage limit reached"
+        return True, "Valid"
+    
+    def calculate_discount(self, original_amount):
+        """Calculate discounted amount"""
+        from decimal import Decimal
+        original_amount = Decimal(str(original_amount))
+        discount_value = Decimal(str(self.discount_value))
+        
+        if self.discount_type == 'percentage':
+            discount = (original_amount * discount_value) / Decimal('100')
+            return float(max(Decimal('0'), original_amount - discount))
+        elif self.discount_type == 'fixed':
+            return float(max(Decimal('0'), original_amount - discount_value))
+        elif self.discount_type == 'free_trial':
+            return 0.0  # 100% discount
+        return float(original_amount)
+
+
+class PromoCodeUsage(models.Model):
+    """Track promo code usage by users"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    promo_code = models.ForeignKey(PromoCode, on_delete=models.CASCADE, related_name='usages')
+    user_id = models.CharField(max_length=255)
+    subscription = models.ForeignKey(UserSubscription, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    original_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    discounted_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    discount_applied = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    used_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-used_at']
+        indexes = [
+            models.Index(fields=['promo_code', 'user_id']),
+            models.Index(fields=['user_id', '-used_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user_id} used {self.promo_code.code} (Saved ₹{self.discount_applied})"
 
 
 class FeatureUsageLog(models.Model):
@@ -598,7 +841,7 @@ class QuizSettings(models.Model):
         help_text="Conversion rate: 1 coin = X currency"
     )
     min_coins_for_redemption = models.IntegerField(
-        default=100,
+        default=10,
         help_text="Minimum coins required for redemption"
     )
     
@@ -627,3 +870,313 @@ class QuizSettings(models.Model):
     def delete(self, *args, **kwargs):
         # Prevent deletion
         pass
+
+
+class CoinWithdrawal(models.Model):
+    """Track coin withdrawal requests and payouts"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_id = models.CharField(max_length=255, db_index=True)
+    
+    # Withdrawal details
+    coins_amount = models.IntegerField()  # Coins to withdraw
+    rupees_amount = models.DecimalField(max_digits=10, decimal_places=2)  # Amount in rupees (coins/10)
+    payout_amount = models.IntegerField()  # Amount in paise for Razorpay
+    
+    # Bank/UPI details
+    account_holder_name = models.CharField(max_length=255)
+    account_number = models.CharField(max_length=50, blank=True, null=True)
+    ifsc_code = models.CharField(max_length=20, blank=True, null=True)
+    upi_id = models.CharField(max_length=100, blank=True, null=True)
+    payout_method = models.CharField(max_length=20, choices=[('bank', 'Bank Transfer'), ('upi', 'UPI')])
+    
+    # Razorpay payout details
+    razorpay_payout_id = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    razorpay_fund_account_id = models.CharField(max_length=255, blank=True, null=True)
+    razorpay_contact_id = models.CharField(max_length=255, blank=True, null=True)
+    
+    # Status and tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    failure_reason = models.TextField(blank=True, null=True)
+    admin_notes = models.TextField(blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user_id', 'status']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user_id} - {self.coins_amount} coins (₹{self.rupees_amount}) - {self.status}"
+
+
+class RazorpayOrder(models.Model):
+    """Track Razorpay payment orders"""
+    STATUS_CHOICES = [
+        ('created', 'Created'),
+        ('attempted', 'Attempted'),
+        ('paid', 'Paid'),
+        ('failed', 'Failed'),
+        ('refunded', 'Refunded'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_id = models.CharField(max_length=255, db_index=True)
+    
+    # Razorpay order details
+    razorpay_order_id = models.CharField(max_length=255, unique=True, db_index=True)
+    razorpay_payment_id = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    razorpay_signature = models.CharField(max_length=500, blank=True, null=True)
+    
+    # Order details
+    amount = models.DecimalField(max_digits=10, decimal_places=2)  # Amount in rupees
+    amount_paise = models.IntegerField()  # Amount in smallest currency unit (paise)
+    currency = models.CharField(max_length=10, default='INR')
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='created')
+    
+    # Additional details
+    receipt = models.CharField(max_length=255, blank=True, null=True)
+    notes = models.JSONField(default=dict, blank=True)
+    
+    # Payment details
+    payment_method = models.CharField(max_length=50, blank=True, null=True)  # 'card', 'upi', 'netbanking', etc.
+    payment_email = models.EmailField(blank=True, null=True)
+    payment_contact = models.CharField(max_length=20, blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user_id', '-created_at']),
+            models.Index(fields=['status']),
+            models.Index(fields=['razorpay_order_id']),
+        ]
+    
+    def __str__(self):
+        return f"Order {self.razorpay_order_id} - {self.status} - ₹{self.amount}"
+    
+    def mark_as_paid(self, payment_id, signature):
+        """Mark order as paid"""
+        self.razorpay_payment_id = payment_id
+        self.razorpay_signature = signature
+        self.status = 'paid'
+        self.paid_at = timezone.now()
+        self.save()
+    
+    def mark_as_failed(self):
+        """Mark order as failed"""
+        self.status = 'failed'
+        self.save()
+
+
+# ============================================================================
+# SUBSCRIPTION & PRICING MODELS (As per Product Spec)
+# ============================================================================
+
+class PlanSubscription(models.Model):
+    """
+    Track user subscription plans (FREE or PAID)
+    Replaces UserSubscription for pricing model
+    """
+    PLAN_TYPE_CHOICES = [
+        ('FREE', 'Free Plan'),
+        ('PAID', 'Paid Plan'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('ACTIVE', 'Active'),
+        ('PAST_DUE', 'Past Due'),
+        ('CANCELLED', 'Cancelled'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_id = models.CharField(max_length=255, unique=True, db_index=True)
+    
+    # Plan details
+    plan_type = models.CharField(max_length=10, choices=PLAN_TYPE_CHOICES, default='FREE')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='ACTIVE')
+    
+    # Razorpay subscription details
+    razorpay_subscription_id = models.CharField(max_length=255, blank=True, null=True, unique=True)
+    razorpay_plan_id = models.CharField(max_length=255, blank=True, null=True)
+    
+    # Billing cycle
+    current_period_start = models.DateTimeField(null=True, blank=True)
+    current_period_end = models.DateTimeField(null=True, blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    activated_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'plan_subscription'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user_id']),
+            models.Index(fields=['plan_type', 'status']),
+            models.Index(fields=['razorpay_subscription_id']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user_id} - {self.plan_type} ({self.status})"
+    
+    def activate_paid_plan(self, razorpay_subscription_id, razorpay_plan_id):
+        """Activate paid plan"""
+        self.plan_type = 'PAID'
+        self.status = 'ACTIVE'
+        self.razorpay_subscription_id = razorpay_subscription_id
+        self.razorpay_plan_id = razorpay_plan_id
+        self.activated_at = timezone.now()
+        self.current_period_start = timezone.now()
+        self.current_period_end = timezone.now() + timedelta(days=30)
+        self.save()
+        
+        # Initialize usage quotas
+        UsageQuota.objects.get_or_create(user_id=self.user_id)
+    
+    def downgrade_to_free(self):
+        """Downgrade to free plan"""
+        self.plan_type = 'FREE'
+        self.status = 'ACTIVE'
+        self.cancelled_at = timezone.now()
+        self.save()
+    
+    def mark_past_due(self):
+        """Mark subscription as past due"""
+        self.status = 'PAST_DUE'
+        self.save()
+    
+    def is_paid_active(self):
+        """Check if user has active paid subscription"""
+        return self.plan_type == 'PAID' and self.status == 'ACTIVE'
+
+
+class UsageQuota(models.Model):
+    """
+    Track monthly usage limits for paid features
+    Limits reset every billing cycle
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user_id = models.CharField(max_length=255, unique=True, db_index=True)
+    
+    # Monthly usage counters (30 per month for paid users)
+    quizzes_used = models.IntegerField(default=0)
+    mock_tests_used = models.IntegerField(default=0)
+    flashcards_used = models.IntegerField(default=0)
+    predicted_questions_used = models.IntegerField(default=0)
+    youtube_summaries_used = models.IntegerField(default=0)
+    
+    # Reset tracking
+    last_reset_date = models.DateTimeField(auto_now_add=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'usage_quota'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user_id']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user_id} - Quotas"
+    
+    def get_remaining(self, feature):
+        """Get remaining usage for a feature"""
+        MONTHLY_LIMIT = 30
+        used = getattr(self, f'{feature}_used', 0)
+        return max(0, MONTHLY_LIMIT - used)
+    
+    def can_use(self, feature):
+        """Check if user can use a paid feature"""
+        return self.get_remaining(feature) > 0
+    
+    def increment(self, feature):
+        """Increment usage for a feature"""
+        field_name = f'{feature}_used'
+        if hasattr(self, field_name):
+            current_value = getattr(self, field_name)
+            setattr(self, field_name, current_value + 1)
+            self.save()
+    
+    def reset_all(self):
+        """Reset all monthly quotas"""
+        self.quizzes_used = 0
+        self.mock_tests_used = 0
+        self.flashcards_used = 0
+        self.predicted_questions_used = 0
+        self.youtube_summaries_used = 0
+        self.last_reset_date = timezone.now()
+        self.save()
+
+
+class SubscriptionPayment(models.Model):
+    """
+    Track subscription payment transactions
+    """
+    STATUS_CHOICES = [
+        ('created', 'Created'),
+        ('authorized', 'Authorized'),
+        ('captured', 'Captured'),
+        ('failed', 'Failed'),
+        ('refunded', 'Refunded'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    subscription = models.ForeignKey(PlanSubscription, on_delete=models.CASCADE, related_name='payments')
+    
+    # Razorpay details
+    razorpay_payment_id = models.CharField(max_length=255, unique=True)
+    razorpay_order_id = models.CharField(max_length=255, blank=True, null=True)
+    razorpay_signature = models.CharField(max_length=500, blank=True, null=True)
+    
+    # Amount details
+    amount = models.DecimalField(max_digits=10, decimal_places=2)  # Amount in rupees
+    currency = models.CharField(max_length=10, default='INR')
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='created')
+    
+    # Payment method
+    payment_method = models.CharField(max_length=50, blank=True, null=True)
+    
+    # Billing period this payment covers
+    billing_period_start = models.DateTimeField()
+    billing_period_end = models.DateTimeField()
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    captured_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'subscription_payment'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['subscription', '-created_at']),
+            models.Index(fields=['razorpay_payment_id']),
+            models.Index(fields=['status']),
+        ]
+    
+    def __str__(self):
+        return f"Payment {self.razorpay_payment_id} - ₹{self.amount} ({self.status})"

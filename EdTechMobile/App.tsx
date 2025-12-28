@@ -33,15 +33,17 @@ import { LandingPageDashboard } from './src/components/LandingPageDashboard';
 import { LandingPage } from './src/components/LandingPage';
 import { MainDashboard } from './src/components/MainDashboard';
 import { TrendAnalysis } from './src/components/TrendAnalysis';
+import { PreviousYearPapers } from './src/components/PreviousYearPapers';
 import { getUserCoins } from './src/services/api';
 import { DailyQuizScreen } from './src/components/DailyQuizScreen';
 import { PairQuizContainer } from './src/components/pair-quiz';
+import { WithdrawalScreen } from './src/components/WithdrawalScreen';
 import { solveQuestionByText, solveQuestionByImage, checkHealth, generateQuiz, generateFlashcards, generateStudyMaterial, summarizeYouTubeVideo, generatePredictedQuestions } from './src/services/api';
 import { generateMockTest } from './src/services/mockTestService';
 import { colors, spacing, borderRadius, typography, shadows } from './src/styles/theme';
 
 type TabType = 'text' | 'image';
-type PageType = 'dashboard' | 'mock-test' | 'quiz' | 'flashcards' | 'ask' | 'predicted-questions' | 'youtube-summarizer' | 'pricing' | 'profile' | 'trends' | 'daily-quiz' | 'pair-quiz';
+type PageType = 'dashboard' | 'mock-test' | 'quiz' | 'flashcards' | 'ask' | 'predicted-questions' | 'youtube-summarizer' | 'pricing' | 'profile' | 'trends' | 'daily-quiz' | 'pair-quiz' | 'previous-papers' | 'withdrawal';
 type DashboardSection = 'overview' | 'quiz' | 'flashcards' | 'study-material';
 type AppScreenType = 'auth' | 'landing' | 'main';
 
@@ -66,9 +68,11 @@ const isWeb = Platform.OS === 'web';
   { id: 'flashcards' as PageType, label: 'Flashcards', icon: 'style' },
   { id: 'ask' as PageType, label: 'Ask Question', icon: 'help' },
   { id: 'predicted-questions' as PageType, label: 'Predicted Questions', icon: 'psychology' },
+  { id: 'previous-papers' as PageType, label: 'Previous Papers', icon: 'description' },
   { id: 'trends' as PageType, label: 'PYQ Features', icon: 'analytics' },
   { id: 'daily-quiz' as PageType, label: 'Daily Quiz', icon: 'emoji-events' },
   { id: 'youtube-summarizer' as PageType, label: 'YouTube Summarizer', icon: 'ondemand-video' },
+  { id: 'withdrawal' as PageType, label: 'Withdraw Coins', icon: 'account-balance-wallet' },
   { id: 'pricing' as PageType, label: 'Pricing', icon: 'local-offer' },
 ];
 
@@ -144,11 +148,16 @@ export default function App() {
   const loadUserCoins = async () => {
     try {
       if (user?.id) {
+        console.log('=== LOADING USER COINS ===');
+        console.log('User ID:', user.id);
         const data = await getUserCoins(user.id);
+        console.log('API Response:', data);
+        console.log('Total coins from API:', data.total_coins);
         setUserCoins(data.total_coins || 0);
+        console.log('Updated userCoins state to:', data.total_coins || 0);
       }
     } catch (e) {
-      // ignore
+      console.error('Failed to load user coins:', e);
     }
   };
 
@@ -510,10 +519,13 @@ export default function App() {
 
         {/* Always show compact right-side: coins + avatar (removes search and notifications) */}
         <View style={styles.topRightCompact}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          <TouchableOpacity 
+            onPress={() => setCurrentPage('withdrawal')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, backgroundColor: 'transparent', paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border }}
+          >
             <Image source={require('./assets/coins.png')} style={{ width: 20, height: 20 }} />
-            <Text style={{ marginLeft: 8, color: colors.text, fontWeight: '700' }}>{userCoins}</Text>
-          </View>
+            <Text style={{ color: colors.text, fontWeight: '700' }}>{userCoins}</Text>
+          </TouchableOpacity>
           <View style={styles.avatarSmall}>
             <MaterialIcons name="account-circle" size={28} color={colors.primary} />
           </View>
@@ -1086,17 +1098,52 @@ export default function App() {
             <View style={styles.featurePageContainer}>
               <DailyQuizScreen
                 userId={user?.id || 'guest'}
-                onComplete={() => { setCurrentPage('ask'); setDailyQuizCount(prev => prev + 1); loadUserCoins(); }}
-                onClose={() => setCurrentPage('ask')}
+                onComplete={(totalCoins) => { 
+                  console.log('=== APP.TSX onComplete CALLED ===');
+                  console.log('Received totalCoins:', totalCoins);
+                  console.log('Current userCoins state:', userCoins);
+                  
+                  setCurrentPage('ask'); 
+                  setDailyQuizCount(prev => prev + 1); 
+                  
+                  // Always refresh coins from server to ensure accuracy
+                  loadUserCoins();
+                  
+                  if (totalCoins !== undefined) {
+                    console.log('Setting userCoins to:', totalCoins);
+                    setUserCoins(totalCoins);
+                  } else {
+                    console.warn('totalCoins is undefined, only calling loadUserCoins');
+                  }
+                }}
+                onClose={() => {
+                  setCurrentPage('ask');
+                  // Refresh coins when closing quiz
+                  loadUserCoins();
+                }}
               />
             </View>
           </ScrollView>
+        </View>
+      ) : currentPage === 'withdrawal' ? (
+        <View style={{ flex: 1 }}>
+          <WithdrawalScreen
+            userId={user?.id || 'guest'}
+            onClose={() => setCurrentPage('ask')}
+            onWithdrawalSuccess={() => {
+              loadUserCoins();
+            }}
+          />
         </View>
       ) : currentPage === 'trends' ? (
         <View style={{ flex: 1, padding: spacing.lg }}>
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
             <TrendAnalysis onClose={() => setCurrentPage('ask')} />
           </ScrollView>
+        </View>
+      ) : currentPage === 'previous-papers' ? (
+        <View style={{ flex: 1 }}>
+          <PreviousYearPapers />
         </View>
       ) : null}
       </View>
@@ -1191,11 +1238,6 @@ export default function App() {
       </View>
 
       <View style={styles.sidebarFooter}>
-        <TouchableOpacity style={styles.upgradeButton}>
-          <MaterialIcons name="workspace-premium" size={20} color={colors.white} />
-          <Text style={styles.upgradeText}>Upgrade Plan</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <MaterialIcons name="logout" size={20} color={colors.error} />
           <Text style={styles.logoutText}>Logout</Text>
@@ -1261,20 +1303,6 @@ const styles = StyleSheet.create({
   navTextActive: {
     color: colors.primary,
     fontWeight: '600',
-  },
-  upgradeButton: {
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    ...shadows.md,
-  },
-  upgradeText: {
-    ...typography.h4,
-    color: colors.white,
   },
   sidebarFooter: {
     gap: spacing.md,

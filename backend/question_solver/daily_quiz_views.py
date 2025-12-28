@@ -9,7 +9,7 @@ from django.db import transaction
 from datetime import date, timedelta
 from .models import (
     DailyQuiz, DailyQuestion, UserDailyQuizAttempt, 
-    UserCoins, CoinTransaction
+    UserCoins, CoinTransaction, QuizSettings
 )
 from .services.gemini_service import gemini_service
 import logging
@@ -86,6 +86,9 @@ def get_daily_quiz(request):
     today = date.today()
     
     try:
+        # Get quiz settings for coin rewards
+        settings = QuizSettings.get_settings()
+        
         # Auto-generate quiz if it doesn't exist (ensure 10 questions)
         daily_quiz = create_or_get_daily_quiz()
         
@@ -110,8 +113,8 @@ def get_daily_quiz(request):
                     'total_questions': existing_attempt.total_questions,
                     'score_percentage': existing_attempt.score_percentage,
                     'coins_earned': existing_attempt.coins_earned,
-                    'attempt_bonus': 5,
-                    'per_correct': 5,
+                    'attempt_bonus': settings.daily_quiz_attempt_bonus,
+                    'per_correct': settings.daily_quiz_coins_per_correct,
                 }
             }, status=status.HTTP_200_OK)
         
@@ -141,9 +144,9 @@ def get_daily_quiz(request):
                 'description': daily_quiz.description,
             },
             'coins': {
-                'attempt_bonus': 5,
-                'per_correct_answer': 5,
-                'max_possible': 5 + (len(questions_data) * 5),
+                'attempt_bonus': settings.daily_quiz_attempt_bonus,
+                'per_correct_answer': settings.daily_quiz_coins_per_correct,
+                'max_possible': settings.daily_quiz_attempt_bonus + (len(questions_data) * settings.daily_quiz_coins_per_correct),
             },
             'questions': [
                 {
@@ -179,6 +182,9 @@ def start_daily_quiz(request):
     Body: { "user_id": "...", "quiz_id": "..." }
     """
     try:
+        # Get quiz settings for coin rewards
+        settings = QuizSettings.get_settings()
+        
         user_id = request.data.get('user_id', 'anonymous')
         quiz_id = request.data.get('quiz_id')
 
@@ -200,8 +206,8 @@ def start_daily_quiz(request):
                 'coins_awarded': existing_attempt.coins_earned,
             }, status=status.HTTP_200_OK)
 
-        # Create attempt and award participation coins (5)
-        attempt_bonus = 5
+        # Create attempt and award participation coins from settings
+        attempt_bonus = settings.daily_quiz_attempt_bonus
 
         with transaction.atomic():
             attempt = UserDailyQuizAttempt.objects.create(
@@ -242,6 +248,9 @@ def submit_daily_quiz(request):
     Returns coins earned with attempt bonus + per correct answer rewards
     """
     try:
+        # Get quiz settings for coin rewards
+        settings = QuizSettings.get_settings()
+        
         user_id = request.data.get('user_id', 'anonymous')
         quiz_id = request.data.get('quiz_id')
         answers = request.data.get('answers', {})
@@ -272,40 +281,50 @@ def submit_daily_quiz(request):
         results = []
         
         for idx, q in enumerate(questions, 1):
-            # Get user's answer (option index)
-            user_answer_idx = answers.get(str(idx), -1)
-            
-            # Convert correct answer letter to index (A=0, B=1, C=2, D=3)
-            correct_idx = ord(q.correct_answer.upper()) - ord('A')
-            
+            # Safely parse user's answer (option index). Clients may send keys as int or str.
+            ua = answers.get(str(idx), answers.get(idx, -1))
+            try:
+                user_answer_idx = int(ua)
+            except Exception:
+                user_answer_idx = -1
+
+            # Safely compute correct index from letter (A=0, B=1...)
+            correct_idx = -1
+            try:
+                correct_ans = (q.correct_answer or '').strip()
+                if correct_ans:
+                    correct_idx = ord(correct_ans[0].upper()) - ord('A')
+            except Exception:
+                correct_idx = -1
+
             is_correct = (user_answer_idx == correct_idx)
-            
             if is_correct:
                 correct_count += 1
-            
-            # Get option texts - options are already strings in the list
+
+            # Ensure options is a list
             options = q.options if isinstance(q.options, list) else []
+            # Safe text values for user's answer and correct answer
             user_answer_text = options[user_answer_idx] if 0 <= user_answer_idx < len(options) else "No answer"
-            correct_answer_text = options[correct_idx] if 0 <= correct_idx < len(options) else q.correct_answer
-            
+            correct_answer_text = options[correct_idx] if 0 <= correct_idx < len(options) else (q.correct_answer or '')
+
             results.append({
                 'question_id': idx,
-                'question': q.question_text,
+                'question': getattr(q, 'question_text', '') or str(q),
                 'options': options,
                 'user_answer': user_answer_text,
                 'correct_answer': correct_answer_text,
                 'is_correct': is_correct,
-                'explanation': q.explanation,
-                'fun_fact': q.fun_fact or '',
-                'category': q.category,
+                'explanation': getattr(q, 'explanation', '') or '',
+                'fun_fact': getattr(q, 'fun_fact', '') or '',
+                'category': getattr(q, 'category', '') or '',
             })
         
         total_questions = len(questions)
         score_percentage = (correct_count / total_questions * 100) if total_questions > 0 else 0
         
-        # Calculate coins: 5 for attempt (if not already awarded) + 5 per correct answer
-        attempt_bonus = 5
-        per_correct = 5
+        # Calculate coins using settings: attempt bonus + per correct answer
+        attempt_bonus = settings.daily_quiz_attempt_bonus
+        per_correct = settings.daily_quiz_coins_per_correct
         coins_from_correct = correct_count * per_correct
         max_possible = attempt_bonus + (total_questions * per_correct)  # Dynamic based on question count
         
@@ -381,8 +400,10 @@ def submit_daily_quiz(request):
             'error': 'Quiz not found'
         }, status=status.HTTP_404_NOT_FOUND)
     except Exception as e:
+        # Log full exception with stack trace for debugging
+        logger.exception("Error while submitting daily quiz")
         return Response({
-            'error': str(e)
+            'error': 'Internal server error while processing submission'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -535,3 +556,41 @@ def get_daily_quiz_attempt_detail(request):
     except Exception as e:
         logger.error(f"Error fetching attempt detail: {e}", exc_info=True)
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+def get_quiz_settings(request):
+    """
+    Get global quiz settings including coin rewards.
+    Admins can edit these in Django admin panel in real-time.
+    """
+    try:
+        settings = QuizSettings.get_settings()
+        
+        return Response({
+            'success': True,
+            'settings': {
+                'daily_quiz': {
+                    'attempt_bonus': settings.daily_quiz_attempt_bonus,
+                    'coins_per_correct': settings.daily_quiz_coins_per_correct,
+                    'perfect_score_bonus': settings.daily_quiz_perfect_score_bonus,
+                },
+                'pair_quiz': {
+                    'enabled': settings.pair_quiz_enabled,
+                    'session_timeout': settings.pair_quiz_session_timeout,
+                    'max_questions': settings.pair_quiz_max_questions,
+                },
+                'coin_system': {
+                    'coin_to_currency_rate': float(settings.coin_to_currency_rate),
+                    'min_coins_for_redemption': settings.min_coins_for_redemption,
+                }
+            },
+            'updated_at': settings.updated_at,
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"Error fetching quiz settings: {e}", exc_info=True)
+        return Response({
+            'error': str(e),
+            'message': 'Failed to fetch quiz settings'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

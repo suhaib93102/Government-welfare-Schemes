@@ -207,7 +207,7 @@ const AnimatedLoader: React.FC<AnimatedLoaderProps> = ({
 
   if (overlay) {
     return (
-      <Animated.View style={[styles.overlay, { opacity, pointerEvents: 'none' }]}>
+      <Animated.View style={[styles.overlay, { opacity }]} pointerEvents="auto">
         {content}
       </Animated.View>
     );
@@ -223,7 +223,8 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: 'transparent',
+    // Subtle light dim to blend with app background and ensure visibility on all themes
+    backgroundColor: 'rgba(249,250,251,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 9999,

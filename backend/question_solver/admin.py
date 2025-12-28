@@ -8,6 +8,35 @@ from django.utils.safestring import mark_safe
 import json
 
 
+@admin.register(models.SubscriptionPlan)
+class SubscriptionPlanAdmin(admin.ModelAdmin):
+	list_display = (
+		'display_name', 'name', 'first_month_price', 'recurring_price', 'currency', 'is_active'
+	)
+	list_filter = ('is_active', 'name')
+	search_fields = ('display_name', 'description')
+	readonly_fields = ('created_at', 'updated_at')
+	fieldsets = (
+		('Basic Information', {
+			'fields': ('name', 'display_name', 'description', 'is_active')
+		}),
+		('Pricing', {
+			'fields': ('first_month_price', 'recurring_price', 'currency')
+		}),
+		('Feature Limits', {
+			'fields': (
+				'mock_test_limit', 'quiz_limit', 'pair_quiz_limit', 'flashcards_limit',
+				'ask_question_limit', 'predicted_questions_limit', 'previous_papers_limit',
+				'pyq_features_limit', 'youtube_summarizer_limit', 'daily_quiz_limit'
+			),
+			'description': 'Leave blank or null for unlimited access'
+		}),
+		('Timestamps', {
+			'fields': ('created_at', 'updated_at')
+		}),
+	)
+
+
 class PaymentInline(admin.TabularInline):
 	model = models.Payment
 	extra = 0
@@ -23,14 +52,14 @@ def reset_monthly_usage(modeladmin, request, queryset):
 @admin.register(models.UserSubscription)
 class UserSubscriptionAdmin(admin.ModelAdmin):
 	list_display = (
-		'user_id', 'plan', 'ask_questions_used', 'quiz_generated', 'flashcards_generated',
-		'auto_pay_enabled', 'subscription_start_date', 'subscription_end_date',
+		'user_id', 'plan', 'mock_test_used', 'quiz_used', 'flashcards_used',
+		'subscription_status', 'subscription_start_date', 'subscription_end_date',
 	)
-	list_filter = ('plan', 'auto_pay_enabled')
-	search_fields = ('user_id',)
+	list_filter = ('plan', 'subscription_status')
+	search_fields = ('user_id', 'razorpay_customer_id', 'razorpay_subscription_id')
 	inlines = [PaymentInline]
 	actions = [reset_monthly_usage]
-	readonly_fields = ('created_at', 'updated_at', 'subscription_start_date', 'next_billing_date')
+	readonly_fields = ('created_at', 'updated_at', 'subscription_start_date', 'next_billing_date', 'razorpay_customer_id', 'razorpay_subscription_id')
 
 
 @admin.register(models.Payment)

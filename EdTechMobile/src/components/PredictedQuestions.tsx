@@ -6,6 +6,7 @@ import { TextInputComponent } from './TextInput';
 import { ImageUpload } from './ImageUpload';
 import { FileUpload } from './FileUpload';
 import AnimatedLoader from './AnimatedLoader';
+import LoadingWebm from './LoadingWebm';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -69,9 +70,10 @@ export const PredictedQuestions: React.FC<PredictedQuestionsProps> = ({ predicte
   const [activeMethod, setActiveMethod] = useState<'text' | 'file'>('text');
 
   if (loading) {
+    // Use full-screen overlay loader for consistent behavior across screens
     return (
-      <View style={styles.loadingContainer}>
-        <AnimatedLoader visible={true} size="large" />
+      <View style={{ flex: 1 }}>
+        <LoadingWebm visible={true} />
       </View>
     );
   }

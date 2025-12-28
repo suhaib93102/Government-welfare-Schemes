@@ -164,6 +164,11 @@ GOOGLE_VISION_API_KEY = os.getenv('GOOGLE_VISION_API_KEY', '')
 # Razorpay Payment Gateway Configuration
 RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID', '')
 RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET', '')
+RAZORPAY_WEBHOOK_SECRET = os.getenv('RAZORPAY_WEBHOOK_SECRET', '')
+
+# Razorpay Subscription Plan IDs
+RAZORPAY_BASIC_PLAN_ID = os.getenv('RAZORPAY_BASIC_PLAN_ID', 'plan_basic_99')
+RAZORPAY_PREMIUM_PLAN_ID = os.getenv('RAZORPAY_PREMIUM_PLAN_ID', 'plan_premium_499')
 
 # Gemini API
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
@@ -179,3 +184,36 @@ JWT_SECRET = os.getenv('JWT_SECRET', '')
 JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
 JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', 24))
 REFRESH_TOKEN_EXPIRATION_DAYS = int(os.getenv('REFRESH_TOKEN_EXPIRATION_DAYS', 7))
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'ignore_broken_pipe': {
+            '()': 'django.utils.log.CallbackFilter',
+            'callback': lambda record: 'Broken pipe' not in str(record.msg),
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+            'filters': ['ignore_broken_pipe'],
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'django': {
+        'handlers': ['console'],
+        'level': 'INFO',
+        'propagate': False,
+    },
+}

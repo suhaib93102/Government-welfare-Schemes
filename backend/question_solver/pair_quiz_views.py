@@ -10,6 +10,7 @@ from django.utils.decorators import method_decorator
 from datetime import timedelta
 from .models import PairQuizSession
 from .services.gemini_service import GeminiService
+from .decorators import check_feature_access_class_based
 import logging
 import random
 
@@ -743,6 +744,7 @@ def get_random_questions(num_questions=10, difficulty='medium'):
 class CreatePairQuizView(APIView):
     """Create a new pair quiz session"""
     
+    @method_decorator(check_feature_access_class_based('pair_quiz'))
     def post(self, request):
         try:
             user_id = request.data.get('userId')

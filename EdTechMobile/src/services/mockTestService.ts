@@ -9,6 +9,8 @@ import chemistryData from '../../assets/Mock Tests/Chemistry.json';
 import mathsData from '../../assets/Mock Tests/maths.json';
 import biologyData from '../../assets/Mock Tests/Biology.json';
 import dailyQuizData from '../../assets/Mock Tests/DailyQuiz.json';
+import hindiDailyQuizData from '../../assets/Mock Tests/Hindi_Daily.json';
+import { API_BASE_URL } from '../config/api';
 
 export interface MockTestQuestion {
   id: number;
@@ -206,9 +208,9 @@ export const generateMockTest = (config: QuizConfig): any => {
 /**
  * Get random questions from Daily Quiz JSON
  */
-export const getDailyQuizQuestions = (numQuestions: number = 20): any => {
+export const getDailyQuizQuestions = (numQuestions: number = 20, language: 'english' | 'hindi' = 'english'): any => {
   try {
-    const allQuestions = dailyQuizData as MockTestQuestion[];
+    const allQuestions = (language === 'hindi' ? hindiDailyQuizData : dailyQuizData) as MockTestQuestion[];
     
     if (allQuestions.length === 0) {
       throw new Error('No daily quiz questions available');
@@ -222,8 +224,8 @@ export const getDailyQuizQuestions = (numQuestions: number = 20): any => {
     const normalizedQuestions = selected.map(normalizeQuestion);
 
     return {
-      title: 'Daily Quiz',
-      topic: 'General Knowledge',
+      title: language === 'hindi' ? 'दैनिक प्रश्नोत्तरी' : 'Daily Quiz',
+      topic: language === 'hindi' ? 'सामान्य ज्ञान' : 'General Knowledge',
       difficulty: 'mixed',
       questions: normalizedQuestions,
       timeLimit: numQuestions * 1, // 1 minute per question for daily quiz
@@ -233,7 +235,48 @@ export const getDailyQuizQuestions = (numQuestions: number = 20): any => {
   }
 };
 
+/**
+ * Fetch quiz settings from backend (rewards, coin amounts, etc.)
+ */
+export const getQuizSettings = async (): Promise<any> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/quiz/settings/`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to fetch quiz settings');
+    }
+    
+    return data.settings;
+  } catch (error: any) {
+    console.error('Error fetching quiz settings:', error);
+    // Return default values as fallback
+    return {
+      daily_quiz: {
+        attempt_bonus: 5,
+        coins_per_correct: 5,
+        perfect_score_bonus: 10,
+      },
+      pair_quiz: {
+        enabled: true,
+        session_timeout: 30,
+        max_questions: 20,
+      },
+      coin_system: {
+        coin_to_currency_rate: 0.10,
+        min_coins_for_redemption: 100,
+      }
+    };
+  }
+};
+
 export default {
   generateMockTest,
   getDailyQuizQuestions,
+  getQuizSettings,
 };

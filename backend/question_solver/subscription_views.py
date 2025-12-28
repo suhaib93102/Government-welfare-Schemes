@@ -1,8 +1,3 @@
-"""
-Subscription and Pricing API Views
-Handles user subscriptions, feature limits, and payments
-"""
-
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -45,12 +40,28 @@ class SubscriptionStatusView(APIView):
             
             limits = subscription.get_feature_limits()
             
+            # Format response to match specification
+            usage_data = {
+                'mock_tests': limits.get('mock_test', {}).get('used', 0),
+                'quizzes': limits.get('quiz', {}).get('used', 0),
+                'flash_cards': limits.get('flashcards', {}).get('used', 0),
+                'pyqs': limits.get('pyqs', {}).get('used', 0),
+                'ask_questions': limits.get('ask_question', {}).get('used', 0),
+                'predicted_questions': limits.get('predicted_questions', {}).get('used', 0),
+                'youtube_summarizer': limits.get('youtube_summarizer', {}).get('used', 0),
+            }
+            
             return Response({
                 'success': True,
                 'user_id': subscription.user_id,
                 'plan': subscription.plan,
+                'razorpay_customer_id': subscription.razorpay_customer_id or '',
+                'razorpay_subscription_id': subscription.razorpay_subscription_id or '',
+                'subscription_status': subscription.subscription_status,
+                'current_period_end': subscription.subscription_end_date,
+                'usage': usage_data,
                 'feature_limits': limits,
-                'auto_pay_enabled': subscription.auto_pay_enabled,
+                'auto_pay_enabled': subscription.subscription_status == 'active',
                 'subscription_start_date': subscription.subscription_start_date,
                 'next_billing_date': subscription.next_billing_date,
                 'created': created

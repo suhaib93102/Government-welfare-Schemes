@@ -161,7 +161,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           >
             {loading ? (
               <>
-                <AnimatedLoader visible={true} size="small" color={colors.white} />
+                <ActivityIndicator size="small" color={colors.white} />
                 <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>Processing...</Text>
               </>
             ) : (
@@ -182,6 +182,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    minHeight: 340,
   },
   dropzone: {
     borderWidth: 2,
@@ -190,7 +191,9 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.xl * 2,
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.backgroundGray,
+    minHeight: 340,
   },
   dropzoneTitle: {
     ...typography.h3,

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
 import AnimatedLoader from './AnimatedLoader';
+import LoadingWebm from './LoadingWebm';
 
 interface Concept {
   name: string;
@@ -35,7 +36,7 @@ export const StudyMaterial: React.FC<StudyMaterialProps> = ({ studyMaterialData,
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <AnimatedLoader visible={true} size="large" />
+        <LoadingWebm visible={true} />
         <Text style={styles.loadingSubtext}>This may take a few seconds</Text>
       </View>
     );

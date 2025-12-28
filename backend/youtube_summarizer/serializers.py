@@ -15,6 +15,11 @@ class YouTubeSummaryResponseSerializer(serializers.Serializer):
     """Serializer for the response"""
     title = serializers.CharField()
     summary = serializers.CharField()
+    concepts = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        allow_empty=True
+    )
     notes = serializers.ListField(child=serializers.CharField())
     questions = serializers.ListField(child=serializers.CharField())
     estimated_reading_time = serializers.CharField(required=False)

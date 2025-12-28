@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platfo
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
 import AnimatedLoader from './AnimatedLoader';
+import LoadingWebm from './LoadingWebm';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -13,8 +14,10 @@ export default function YouTubeSummarizerNew({ summaryData = null, loading = fal
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <AnimatedLoader visible={true} size="large" />
+      <View style={styles.container}>
+        <View style={styles.card}>
+          <LoadingWebm visible={true} overlay={false} />
+        </View>
       </View>
     );
   }
@@ -59,13 +62,41 @@ export default function YouTubeSummarizerNew({ summaryData = null, loading = fal
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
-  card: { width: '100%', maxWidth: isWeb && !isMobile ? 900 : '100%', backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.lg, ...shadows.md, alignItems: 'center' },
-  headerImage: { width: 80, height: 80, marginBottom: spacing.md },
-  title: { ...typography.h2, textAlign: 'center' },
-  subtitle: { ...typography.body, color: colors.textMuted, textAlign: 'center', marginBottom: spacing.md },
-  input: { width: '100%', borderWidth: 1, borderColor: colors.border, borderRadius: borderRadius.md, padding: spacing.md, marginBottom: spacing.md, color: colors.text },
-  button: { width: '100%', backgroundColor: colors.primary, padding: spacing.md, borderRadius: borderRadius.md, flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, alignItems: 'center' as any },
+  container: { flex: 1, backgroundColor: colors.background, padding: isMobile ? spacing.md : spacing.lg },
+  card: { 
+    width: '100%', 
+    maxWidth: isMobile ? '100%' : 800, 
+    backgroundColor: colors.white, 
+    borderRadius: borderRadius.lg, 
+    padding: isMobile ? spacing.lg : spacing.xl, 
+    ...shadows.md, 
+    alignItems: 'center' 
+  },
+  headerImage: { width: isMobile ? 64 : 80, height: isMobile ? 64 : 80, marginBottom: spacing.md },
+  title: { ...typography.h2, fontSize: isMobile ? 22 : 28, textAlign: 'center', marginBottom: spacing.sm },
+  subtitle: { ...typography.body, fontSize: isMobile ? 14 : 16, color: colors.textMuted, textAlign: 'center', marginBottom: spacing.lg, paddingHorizontal: isMobile ? 0 : spacing.md },
+  input: { 
+    width: '100%', 
+    borderWidth: 1, 
+    borderColor: colors.border, 
+    borderRadius: borderRadius.md, 
+    padding: spacing.md, 
+    marginBottom: spacing.md, 
+    color: colors.text,
+    fontSize: isMobile ? 14 : 16,
+    minHeight: isMobile ? 44 : 48,
+  },
+  button: { 
+    width: '100%', 
+    backgroundColor: colors.primary, 
+    padding: spacing.md, 
+    borderRadius: borderRadius.md, 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    gap: spacing.sm, 
+    alignItems: 'center' as any,
+    minHeight: isMobile ? 48 : 52,
+  },
   buttonDisabled: { opacity: 0.6, backgroundColor: colors.textMuted },
   buttonText: { ...typography.h4, color: colors.white, marginLeft: spacing.sm },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 20, backgroundColor: 'transparent' },
